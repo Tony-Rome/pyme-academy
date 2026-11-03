@@ -35,22 +35,55 @@ docker compose up -d --wait
 npm install
 ```
 
-API, con migraciones automáticas al arrancar:
+API, con migraciones automáticas al arrancar.
+
+PowerShell (Windows):
+
+```powershell
+cd apps/api
+$env:DATABASE_URL = "postgres://musicacademy:musicacademy@localhost:5433/musicacademy?sslmode=disable"
+$env:MIGRATE_ON_START = "true"
+go run ./cmd/api
+```
+
+Bash (Git Bash, macOS, Linux):
 
 ```bash
 cd apps/api
 DATABASE_URL='postgres://musicacademy:musicacademy@localhost:5433/musicacademy?sslmode=disable' MIGRATE_ON_START=true go run ./cmd/api
 ```
 
-Web, en otra terminal (usa un proxy hacia la API en `localhost:8080`):
+Comprobación: `http://localhost:8080/api/v1/readyz` debe responder `{"status":"ok"}`.
+
+Web:
 
 ```bash
 npm run dev:web
 ```
 
-Abre http://localhost:5173. Debe mostrar "Conectado".
+Abre http://localhost:5173. Por defecto la web usa **datos de ejemplo** (API simulada en la propia página, sin necesitar la API ni Postgres): la insignia de la cabecera dice "Datos de ejemplo" y el selector de al lado permite ver la aplicación como dirección, profesor o apoderado.
+
+Para hablar con la API real, cambia `VITE_MOCK_API` a `false` en `apps/web/.env.development` (o crea `apps/web/.env.development.local` con ese valor, que Git ignora) y levanta la API como se indica arriba. La web usa un proxy hacia `localhost:8080` y la insignia debe decir "Conectado". Los endpoints nuevos del contrato responden 501 hasta que se implementen.
+
+## Cómo se desarrolla la interfaz antes que el backend
+
+1. El contrato (`apps/api/openapi/openapi.yaml`) define los endpoints antes de implementarlos.
+2. La API simulada (`apps/web/src/mocks/`) responde a ese contrato con datos de ejemplo; los tipos vienen del cliente generado, así que si el contrato cambia, TypeScript marca lo que hay que ajustar.
+3. Al implementar un endpoint en Go se cumple el mismo contrato y la web no cambia.
+
+El código de simulación no entra en el build de producción.
 
 ## Pruebas
+
+PowerShell (Windows):
+
+```powershell
+cd apps/api
+$env:TEST_DATABASE_URL = "postgres://musicacademy:musicacademy@localhost:5433/postgres?sslmode=disable"
+go test ./...
+```
+
+Bash:
 
 ```bash
 cd apps/api

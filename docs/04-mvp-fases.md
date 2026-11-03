@@ -135,7 +135,7 @@ Si el piloto no cumple, no se avanza: se investiga por qué (adopción de profes
 2. **Control de mensualidades:** cargos generados automáticamente cada mes, estado (pendiente, pagado, vencido) y registro manual de pagos (transferencia, efectivo).
 3. **Descuentos y becas:** por hermanos, convenios o beca, con porcentaje o monto y vigencia.
 4. **Morosidad:** lista de deudores, recordatorios automáticos por email y reporte para el director.
-5. **Recuperaciones y créditos:** regla configurable (cuántas se recuperan, hasta cuándo) que genera un crédito al cancelar la academia o justificar el alumno.
+5. **Recuperaciones y créditos:** el alumno no pierde ninguna clase mientras tenga su plan pagado (ver decisión 3 en la sección 6). Una ausencia acordada de antemano con el profesor, o una cancelación de la academia, genera un crédito que se consume reagendando.
 6. **Liquidación de honorarios:** por profesor y período, a partir de horas dictadas, reemplazos y feriados, con reporte exportable.
 
 ### Funciones importantes
@@ -228,8 +228,34 @@ Se detalla al cerrar la fase 3, con base en lo que pidan los pilotos.
 
 ## 6. Decisiones pendientes
 
-1. País y normativa aplicable (datos de menores, tributación, proveedores de pago).
-2. Edad desde la cual un alumno tiene cuenta propia.
-3. Política de recuperación de clases por defecto.
-4. Academia(s) piloto y fecha de inicio.
-5. Qué Postgres administrado usar (Neon o Supabase).
+1. País y normativa aplicable (datos de menores, tributación, proveedores de pago): País Chile, normativa queda pendiente
+2. Edad desde la cual un alumno tiene cuenta propia: desde 18 años
+3. Política de recuperación de clases por defecto: estudiante no pierde ninguna clase mientras lo tenga pagado, por lo que puede estar sin asistir algunas semanas, todo con previo acuerdo con su profesor.
+4. Academia(s) piloto y fecha de inicio: Dejar pendiente
+5. Qué Postgres administrado usar (Neon o Supabase): usar Neon
+
+### Consecuencias de lo decidido
+
+**Decisión 2: cuenta propia desde los 18 años.**
+- El valor por defecto de `academy_settings.student_own_account_min_age` pasó de 14 a 18 (migración `00002`, con prueba automática).
+- Un alumno menor de 18 nunca tiene sesión propia: todo pasa por su apoderado.
+- Un alumno de 18 o más se registra con su propia cuenta y no necesita apoderado. En la fase 2 habrá que decidir si también es quien paga.
+
+**Decisión 3: no se pierde ninguna clase mientras el plan esté pagado.**
+- La clase no se descuenta: una ausencia acordada con el profesor genera un crédito, y el crédito vive mientras el plan esté pagado.
+- Necesita un flujo nuevo, **ausencia acordada**: el apoderado o alumno avisa, el profesor la aprueba antes de la clase, y solo entonces cuenta como justificada con crédito.
+- Depende de los pagos (fase 2), porque "mientras esté pagado" se calcula con las mensualidades. En la fase 1 basta con poder marcar una ausencia como "acordada con el profesor", sin calcular créditos todavía.
+- Efecto sobre el reagendamiento: el tope mensual (`reschedule_monthly_limit`, 2 por defecto) puede chocar con esta política. Conviene subirlo o desactivarlo por defecto en cuanto se implementen los créditos.
+- **Sin definir todavía:**
+  - ¿Los créditos vencen alguna vez, o se acumulan sin límite mientras el plan siga pagado?: Por el momento se acumulan sin límites mientras el plan siga pagado
+  - ¿Hay un máximo de semanas seguidas sin asistir?: Por el momento no
+  - Si el alumno se retira con créditos pendientes, ¿se pierden, se devuelven o se transfieren?: El alumno pierde los créditos
+
+**Decisión 5: Neon.**
+- Neon es solo PostgreSQL: no trae autenticación ni archivos. La autenticación ya la hace la API en Go; los archivos irán a un almacenamiento aparte compatible con S3 (por ejemplo Cloudflare R2).
+- El aislamiento entre academias debe reforzarse con Row Level Security propio, porque no viene incluido.
+- Neon ofrece conexión directa y conexión "con pool". Las migraciones y las pruebas deben usar la **directa**; la API en producción puede usar la con pool, con ajustes en pgx para que no use consultas preparadas.
+- Hay que confirmar en el piloto que están habilitadas las extensiones `btree_gist` y `citext`, de las que depende el esquema.
+- Las bases de datos con inactividad pueden "dormirse" y tardar en responder la primera vez; conviene tenerlo en cuenta para `/readyz`.
+
+**Decisiones 1 y 4: siguen pendientes.** No bloquean la fase 1. El país afecta el texto legal de los consentimientos y los proveedores de pago, y la academia piloto afecta cuándo se puede probar con usuarios reales.

@@ -38,6 +38,251 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Persona autenticada, sus roles y los alumnos a su cargo */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/rooms": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Salas de la academia */
+        get: operations["listRooms"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teachers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Profesores de la academia */
+        get: operations["listTeachers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/class-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Grupos de clase visibles para quien consulta */
+        get: operations["listClassGroups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Sesiones visibles para quien consulta, dentro de un rango
+         * @description Dirección ve todas. Un profesor ve las suyas. Un apoderado ve las de sus pupilos.
+         */
+        get: operations["listSessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{sessionId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Detalle de una sesión */
+        get: operations["getSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{sessionId}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cancelar una sesión (profesor o dirección) y avisar a las familias */
+        post: operations["cancelSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{sessionId}/reschedule-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Horarios libres en que se puede mover la sesión
+         * @description Solo ofrece horarios sin choque de sala ni de profesor que respetan las reglas de la academia.
+         */
+        get: operations["listRescheduleOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{sessionId}/reschedule-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Proponer un nuevo horario para una sesión */
+        post: operations["createRescheduleRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reschedule-requests": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Solicitudes de reagendamiento visibles para quien consulta */
+        get: operations["listRescheduleRequests"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reschedule-requests/{requestId}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Aprobar o rechazar una solicitud */
+        post: operations["decideRescheduleRequest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/sessions/{sessionId}/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Asistencia de una sesión, con un registro por alumno inscrito */
+        get: operations["getAttendance"];
+        /** Guardar la asistencia de una sesión */
+        put: operations["saveAttendance"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Avisos dentro de la app */
+        get: operations["listNotifications"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notifications/{notificationId}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Marcar un aviso como leído */
+        post: operations["markNotificationRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -46,9 +291,233 @@ export interface components {
             /** @enum {string} */
             status: "ok" | "unavailable";
         };
+        Problem: {
+            /**
+             * @description Código estable para que el cliente decida qué mostrar
+             * @example room_conflict
+             */
+            code: string;
+            message: string;
+        };
+        /** @enum {string} */
+        Role: "director" | "teacher" | "guardian" | "student";
+        StudentRef: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+        };
+        Viewer: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            roles: components["schemas"]["Role"][];
+            activeRole: components["schemas"]["Role"];
+            /** @description Alumnos a cargo (apoderado) o la propia persona (alumno adulto) */
+            students: components["schemas"]["StudentRef"][];
+        };
+        Room: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            capacity: number;
+        };
+        Teacher: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            instruments: string[];
+        };
+        /** @enum {string} */
+        GroupKind: "individual" | "group";
+        ClassGroup: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            instrument: string;
+            level: string;
+            kind: components["schemas"]["GroupKind"];
+            /** Format: uuid */
+            teacherId: string;
+            /** Format: uuid */
+            roomId?: string | null;
+            /** @description 0 = domingo */
+            weekday: number;
+            /** @example 16:00 */
+            startTime: string;
+            durationMinutes: number;
+            capacity: number;
+            enrolled: number;
+        };
+        /** @enum {string} */
+        SessionStatus: "scheduled" | "completed" | "cancelled";
+        Session: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            classGroupId: string;
+            groupName: string;
+            instrument: string;
+            /** Format: uuid */
+            teacherId: string;
+            teacherName: string;
+            /**
+             * Format: uuid
+             * @description Profesor titular cuando la sesión tiene reemplazo
+             */
+            originalTeacherId?: string | null;
+            originalTeacherName?: string | null;
+            /** Format: uuid */
+            roomId?: string | null;
+            roomName?: string | null;
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            status: components["schemas"]["SessionStatus"];
+            cancelReason?: string | null;
+            /** @description Alumnos inscritos. Un apoderado solo ve a sus pupilos. */
+            students: components["schemas"]["StudentRef"][];
+            /** Format: uuid */
+            pendingRescheduleRequestId?: string | null;
+        };
+        CancelInput: {
+            reason: string;
+        };
+        /** @enum {string} */
+        RescheduleStatus: "pending" | "approved" | "rejected" | "cancelled" | "expired";
+        RescheduleOption: {
+            /** Format: date-time */
+            startsAt: string;
+            /** Format: date-time */
+            endsAt: string;
+            /** Format: uuid */
+            roomId?: string | null;
+            roomName?: string | null;
+        };
+        RescheduleRequestInput: {
+            /** Format: date-time */
+            proposedStartsAt: string;
+            /** Format: date-time */
+            proposedEndsAt: string;
+            /** Format: uuid */
+            proposedRoomId?: string | null;
+            reason?: string | null;
+        };
+        RescheduleRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            sessionId: string;
+            groupName: string;
+            /** Format: uuid */
+            requestedById: string;
+            requestedByName: string;
+            /** Format: date-time */
+            originalStartsAt: string;
+            /** Format: date-time */
+            originalEndsAt: string;
+            /** Format: date-time */
+            proposedStartsAt: string;
+            /** Format: date-time */
+            proposedEndsAt: string;
+            /** Format: uuid */
+            proposedRoomId?: string | null;
+            proposedRoomName?: string | null;
+            reason?: string | null;
+            status: components["schemas"]["RescheduleStatus"];
+            decisionNote?: string | null;
+            decidedByName?: string | null;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            expiresAt: string;
+        };
+        DecisionInput: {
+            /** @enum {string} */
+            decision: "approve" | "reject";
+            note?: string | null;
+        };
+        /** @enum {string} */
+        AttendanceStatus: "present" | "absent" | "late" | "excused";
+        AttendanceRecord: {
+            /** Format: uuid */
+            studentId: string;
+            fullName: string;
+            /** @description null mientras no se haya marcado */
+            status?: components["schemas"]["AttendanceStatus"] | null;
+            note?: string | null;
+        };
+        AttendanceInput: {
+            records: {
+                /** Format: uuid */
+                studentId: string;
+                status: components["schemas"]["AttendanceStatus"];
+                note?: string | null;
+            }[];
+        };
+        Notification: {
+            /** Format: uuid */
+            id: string;
+            /** @example session_moved */
+            type: string;
+            title: string;
+            body: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            readAt?: string | null;
+        };
     };
-    responses: never;
-    parameters: never;
+    responses: {
+        /** @description Solicitud inválida */
+        BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description No tiene permiso para esta acción */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description No existe o no es visible para quien consulta */
+        NotFound: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Choque de sala o de profesor, o el estado ya cambió */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
+        /** @description Incumple una regla de la academia (anticipación mínima, tope mensual) */
+        PolicyViolation: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
+    };
+    parameters: {
+        SessionId: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -102,6 +571,358 @@ export interface operations {
                     "application/json": components["schemas"]["Health"];
                 };
             };
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Viewer"];
+                };
+            };
+        };
+    };
+    listRooms: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Room"][];
+                };
+            };
+        };
+    };
+    listTeachers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Teacher"][];
+                };
+            };
+        };
+    };
+    listClassGroups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClassGroup"][];
+                };
+            };
+        };
+    };
+    listSessions: {
+        parameters: {
+            query: {
+                from: string;
+                to: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    getSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    cancelSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CancelInput"];
+            };
+        };
+        responses: {
+            /** @description Sesión cancelada */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Session"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listRescheduleOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleOption"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    createRescheduleRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RescheduleRequestInput"];
+            };
+        };
+        responses: {
+            /** @description Solicitud creada */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleRequest"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            422: components["responses"]["PolicyViolation"];
+        };
+    };
+    listRescheduleRequests: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["RescheduleStatus"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleRequest"][];
+                };
+            };
+        };
+    };
+    decideRescheduleRequest: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                requestId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecisionInput"];
+            };
+        };
+        responses: {
+            /** @description Solicitud resuelta */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RescheduleRequest"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    getAttendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"][];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    saveAttendance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                sessionId: components["parameters"]["SessionId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AttendanceInput"];
+            };
+        };
+        responses: {
+            /** @description Asistencia guardada */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listNotifications: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Notification"][];
+                };
+            };
+        };
+    };
+    markNotificationRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                notificationId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Marcado */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            404: components["responses"]["NotFound"];
         };
     };
 }

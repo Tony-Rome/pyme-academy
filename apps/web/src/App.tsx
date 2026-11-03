@@ -1,39 +1,26 @@
-import { useQuery } from "@tanstack/react-query";
-import { api } from "./api";
-
-type State = "checking" | "ok" | "down";
-
-function useApiState(): State {
-  const { data, isPending } = useQuery({
-    queryKey: ["ready"],
-    queryFn: async () => {
-      const { response } = await api.GET("/readyz");
-      return response.ok;
-    },
-    retry: false,
-    refetchInterval: 15_000,
-  });
-
-  if (isPending) return "checking";
-  return data ? "ok" : "down";
-}
-
-const LABELS: Record<State, string> = {
-  checking: "Comprobando…",
-  ok: "Conectado",
-  down: "Sin conexión con la API",
-};
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { AppShell } from "@/components/AppShell";
+import { CalendarPage } from "@/features/calendar/CalendarPage";
 
 export function App() {
-  const state = useApiState();
-
   return (
-    <main>
-      <h1>Academia de Música</h1>
-      <p>Estado del servidor:</p>
-      <p className={`status status-${state}`} role="status">
-        {LABELS[state]}
-      </p>
-    </main>
+    <BrowserRouter>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Navigate to="/calendario" replace />} />
+          <Route path="calendario" element={<CalendarPage />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
+  );
+}
+
+function NotFound() {
+  return (
+    <div className="py-16 text-center">
+      <h1 className="text-lg font-semibold">Página no encontrada</h1>
+      <p className="text-muted-foreground">La dirección no existe.</p>
+    </div>
   );
 }

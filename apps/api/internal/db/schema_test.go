@@ -235,6 +235,22 @@ func TestOnePendingRescheduleRequestPerSession(t *testing.T) {
 	wantCode(t, request(), uniqueViolation)
 }
 
+func TestOwnAccountMinAgeDefaultsTo18(t *testing.T) {
+	pool := testdb.New(t)
+	f := setup(t, pool)
+
+	var age int
+	err := pool.QueryRow(context.Background(),
+		`INSERT INTO academy_settings(academy_id) VALUES ($1) RETURNING student_own_account_min_age`,
+		f.academy).Scan(&age)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if age != 18 {
+		t.Fatalf("la edad mínima por defecto es %d, se esperaba 18", age)
+	}
+}
+
 func TestMigrationsApplyCleanly(t *testing.T) {
 	pool := testdb.New(t)
 

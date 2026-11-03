@@ -1,0 +1,14 @@
+import type { components } from "@music-academy/api-client";
+
+type Schemas = components["schemas"];
+
+export type Role = Schemas["Role"];
+export type Viewer = Schemas["Viewer"];
+export type StudentRef = Schemas["StudentRef"];
+export type Room = Schemas["Room"];
+export type Teacher = Schemas["Teacher"];
+export type ClassGroup = Schemas["ClassGroup"];
+export type Session = Schemas["Session"];
+export type SessionStatus = Schemas["SessionStatus"];
+export type RescheduleRequest = Schemas["RescheduleRequest"];
+export type Notification = Schemas["Notification"];

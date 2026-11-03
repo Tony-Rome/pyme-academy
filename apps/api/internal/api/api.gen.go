@@ -7,11 +7,75 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
+
+// Defines values for AttendanceStatus.
+const (
+	Absent  AttendanceStatus = "absent"
+	Excused AttendanceStatus = "excused"
+	Late    AttendanceStatus = "late"
+	Present AttendanceStatus = "present"
+)
+
+// Valid indicates whether the value is a known member of the AttendanceStatus enum.
+func (e AttendanceStatus) Valid() bool {
+	switch e {
+	case Absent:
+		return true
+	case Excused:
+		return true
+	case Late:
+		return true
+	case Present:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for DecisionInputDecision.
+const (
+	Approve DecisionInputDecision = "approve"
+	Reject  DecisionInputDecision = "reject"
+)
+
+// Valid indicates whether the value is a known member of the DecisionInputDecision enum.
+func (e DecisionInputDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for GroupKind.
+const (
+	Group      GroupKind = "group"
+	Individual GroupKind = "individual"
+)
+
+// Valid indicates whether the value is a known member of the GroupKind enum.
+func (e GroupKind) Valid() bool {
+	switch e {
+	case Group:
+		return true
+	case Individual:
+		return true
+	default:
+		return false
+	}
+}
 
 // Defines values for HealthStatus.
 const (
@@ -31,6 +95,137 @@ func (e HealthStatus) Valid() bool {
 	}
 }
 
+// Defines values for RescheduleStatus.
+const (
+	RescheduleStatusApproved  RescheduleStatus = "approved"
+	RescheduleStatusCancelled RescheduleStatus = "cancelled"
+	RescheduleStatusExpired   RescheduleStatus = "expired"
+	RescheduleStatusPending   RescheduleStatus = "pending"
+	RescheduleStatusRejected  RescheduleStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the RescheduleStatus enum.
+func (e RescheduleStatus) Valid() bool {
+	switch e {
+	case RescheduleStatusApproved:
+		return true
+	case RescheduleStatusCancelled:
+		return true
+	case RescheduleStatusExpired:
+		return true
+	case RescheduleStatusPending:
+		return true
+	case RescheduleStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for Role.
+const (
+	RoleDirector Role = "director"
+	RoleGuardian Role = "guardian"
+	RoleStudent  Role = "student"
+	RoleTeacher  Role = "teacher"
+)
+
+// Valid indicates whether the value is a known member of the Role enum.
+func (e Role) Valid() bool {
+	switch e {
+	case RoleDirector:
+		return true
+	case RoleGuardian:
+		return true
+	case RoleStudent:
+		return true
+	case RoleTeacher:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SessionStatus.
+const (
+	SessionStatusCancelled SessionStatus = "cancelled"
+	SessionStatusCompleted SessionStatus = "completed"
+	SessionStatusScheduled SessionStatus = "scheduled"
+)
+
+// Valid indicates whether the value is a known member of the SessionStatus enum.
+func (e SessionStatus) Valid() bool {
+	switch e {
+	case SessionStatusCancelled:
+		return true
+	case SessionStatusCompleted:
+		return true
+	case SessionStatusScheduled:
+		return true
+	default:
+		return false
+	}
+}
+
+// AttendanceInput defines model for AttendanceInput.
+type AttendanceInput struct {
+	Records []struct {
+		Note      *string            `json:"note,omitempty"`
+		Status    AttendanceStatus   `json:"status"`
+		StudentId openapi_types.UUID `json:"studentId"`
+	} `json:"records"`
+}
+
+// AttendanceRecord defines model for AttendanceRecord.
+type AttendanceRecord struct {
+	FullName string  `json:"fullName"`
+	Note     *string `json:"note,omitempty"`
+
+	// Status null mientras no se haya marcado
+	Status    *AttendanceStatus  `json:"status,omitempty"`
+	StudentId openapi_types.UUID `json:"studentId"`
+}
+
+// AttendanceStatus defines model for AttendanceStatus.
+type AttendanceStatus string
+
+// CancelInput defines model for CancelInput.
+type CancelInput struct {
+	Reason string `json:"reason"`
+}
+
+// ClassGroup defines model for ClassGroup.
+type ClassGroup struct {
+	Capacity        int                 `json:"capacity"`
+	DurationMinutes int                 `json:"durationMinutes"`
+	Enrolled        int                 `json:"enrolled"`
+	Id              openapi_types.UUID  `json:"id"`
+	Instrument      string              `json:"instrument"`
+	Kind            GroupKind           `json:"kind"`
+	Level           string              `json:"level"`
+	Name            string              `json:"name"`
+	RoomId          *openapi_types.UUID `json:"roomId,omitempty"`
+
+	// StartTime Example: 16:00
+	StartTime string             `json:"startTime"`
+	TeacherId openapi_types.UUID `json:"teacherId"`
+
+	// Weekday 0 = domingo
+	Weekday int `json:"weekday"`
+}
+
+// DecisionInput defines model for DecisionInput.
+type DecisionInput struct {
+	Decision DecisionInputDecision `json:"decision"`
+	Note     *string               `json:"note,omitempty"`
+}
+
+// DecisionInputDecision defines model for DecisionInput.Decision.
+type DecisionInputDecision string
+
+// GroupKind defines model for GroupKind.
+type GroupKind string
+
 // Health defines model for Health.
 type Health struct {
 	Status HealthStatus `json:"status"`
@@ -39,19 +234,233 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// Notification defines model for Notification.
+type Notification struct {
+	Body      string             `json:"body"`
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+	ReadAt    *time.Time         `json:"readAt,omitempty"`
+	Title     string             `json:"title"`
+
+	// Type Example: session_moved
+	Type string `json:"type"`
+}
+
+// Problem defines model for Problem.
+type Problem struct {
+	// Code Código estable para que el cliente decida qué mostrar
+	//
+	// Example: room_conflict
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+// RescheduleOption defines model for RescheduleOption.
+type RescheduleOption struct {
+	EndsAt   time.Time           `json:"endsAt"`
+	RoomId   *openapi_types.UUID `json:"roomId,omitempty"`
+	RoomName *string             `json:"roomName,omitempty"`
+	StartsAt time.Time           `json:"startsAt"`
+}
+
+// RescheduleRequest defines model for RescheduleRequest.
+type RescheduleRequest struct {
+	CreatedAt        time.Time           `json:"createdAt"`
+	DecidedByName    *string             `json:"decidedByName,omitempty"`
+	DecisionNote     *string             `json:"decisionNote,omitempty"`
+	ExpiresAt        time.Time           `json:"expiresAt"`
+	GroupName        string              `json:"groupName"`
+	Id               openapi_types.UUID  `json:"id"`
+	OriginalEndsAt   time.Time           `json:"originalEndsAt"`
+	OriginalStartsAt time.Time           `json:"originalStartsAt"`
+	ProposedEndsAt   time.Time           `json:"proposedEndsAt"`
+	ProposedRoomId   *openapi_types.UUID `json:"proposedRoomId,omitempty"`
+	ProposedRoomName *string             `json:"proposedRoomName,omitempty"`
+	ProposedStartsAt time.Time           `json:"proposedStartsAt"`
+	Reason           *string             `json:"reason,omitempty"`
+	RequestedById    openapi_types.UUID  `json:"requestedById"`
+	RequestedByName  string              `json:"requestedByName"`
+	SessionId        openapi_types.UUID  `json:"sessionId"`
+	Status           RescheduleStatus    `json:"status"`
+}
+
+// RescheduleRequestInput defines model for RescheduleRequestInput.
+type RescheduleRequestInput struct {
+	ProposedEndsAt   time.Time           `json:"proposedEndsAt"`
+	ProposedRoomId   *openapi_types.UUID `json:"proposedRoomId,omitempty"`
+	ProposedStartsAt time.Time           `json:"proposedStartsAt"`
+	Reason           *string             `json:"reason,omitempty"`
+}
+
+// RescheduleStatus defines model for RescheduleStatus.
+type RescheduleStatus string
+
+// Role defines model for Role.
+type Role string
+
+// Room defines model for Room.
+type Room struct {
+	Capacity int                `json:"capacity"`
+	Id       openapi_types.UUID `json:"id"`
+	Name     string             `json:"name"`
+}
+
+// Session defines model for Session.
+type Session struct {
+	CancelReason *string            `json:"cancelReason,omitempty"`
+	ClassGroupId openapi_types.UUID `json:"classGroupId"`
+	EndsAt       time.Time          `json:"endsAt"`
+	GroupName    string             `json:"groupName"`
+	Id           openapi_types.UUID `json:"id"`
+	Instrument   string             `json:"instrument"`
+
+	// OriginalTeacherId Profesor titular cuando la sesión tiene reemplazo
+	OriginalTeacherId          *openapi_types.UUID `json:"originalTeacherId,omitempty"`
+	OriginalTeacherName        *string             `json:"originalTeacherName,omitempty"`
+	PendingRescheduleRequestId *openapi_types.UUID `json:"pendingRescheduleRequestId,omitempty"`
+	RoomId                     *openapi_types.UUID `json:"roomId,omitempty"`
+	RoomName                   *string             `json:"roomName,omitempty"`
+	StartsAt                   time.Time           `json:"startsAt"`
+	Status                     SessionStatus       `json:"status"`
+
+	// Students Alumnos inscritos. Un apoderado solo ve a sus pupilos.
+	Students    []StudentRef       `json:"students"`
+	TeacherId   openapi_types.UUID `json:"teacherId"`
+	TeacherName string             `json:"teacherName"`
+}
+
+// SessionStatus defines model for SessionStatus.
+type SessionStatus string
+
+// StudentRef defines model for StudentRef.
+type StudentRef struct {
+	FullName string             `json:"fullName"`
+	Id       openapi_types.UUID `json:"id"`
+}
+
+// Teacher defines model for Teacher.
+type Teacher struct {
+	FullName    string             `json:"fullName"`
+	Id          openapi_types.UUID `json:"id"`
+	Instruments []string           `json:"instruments"`
+}
+
+// Viewer defines model for Viewer.
+type Viewer struct {
+	ActiveRole Role               `json:"activeRole"`
+	FullName   string             `json:"fullName"`
+	Id         openapi_types.UUID `json:"id"`
+	Roles      []Role             `json:"roles"`
+
+	// Students Alumnos a cargo (apoderado) o la propia persona (alumno adulto)
+	Students []StudentRef `json:"students"`
+}
+
+// SessionId defines model for SessionId.
+type SessionId = openapi_types.UUID
+
+// BadRequest defines model for BadRequest.
+type BadRequest = Problem
+
+// Conflict defines model for Conflict.
+type Conflict = Problem
+
+// Forbidden defines model for Forbidden.
+type Forbidden = Problem
+
+// NotFound defines model for NotFound.
+type NotFound = Problem
+
+// PolicyViolation defines model for PolicyViolation.
+type PolicyViolation = Problem
+
+// ListRescheduleRequestsParams defines parameters for ListRescheduleRequests.
+type ListRescheduleRequestsParams struct {
+	Status *RescheduleStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// ListSessionsParams defines parameters for ListSessions.
+type ListSessionsParams struct {
+	From time.Time `form:"from" json:"from"`
+	To   time.Time `form:"to" json:"to"`
+}
+
+// DecideRescheduleRequestJSONRequestBody defines body for DecideRescheduleRequest for application/json ContentType.
+type DecideRescheduleRequestJSONRequestBody = DecisionInput
+
+// SaveAttendanceJSONRequestBody defines body for SaveAttendance for application/json ContentType.
+type SaveAttendanceJSONRequestBody = AttendanceInput
+
+// CancelSessionJSONRequestBody defines body for CancelSession for application/json ContentType.
+type CancelSessionJSONRequestBody = CancelInput
+
+// CreateRescheduleRequestJSONRequestBody defines body for CreateRescheduleRequest for application/json ContentType.
+type CreateRescheduleRequestJSONRequestBody = RescheduleRequestInput
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListClassGroups Grupos de clase visibles para quien consulta
+	// (GET /class-groups)
+	ListClassGroups(w http.ResponseWriter, r *http.Request)
 	// GetHealth El proceso está vivo
 	// (GET /healthz)
 	GetHealth(w http.ResponseWriter, r *http.Request)
+	// GetMe Persona autenticada, sus roles y los alumnos a su cargo
+	// (GET /me)
+	GetMe(w http.ResponseWriter, r *http.Request)
+	// ListNotifications Avisos dentro de la app
+	// (GET /notifications)
+	ListNotifications(w http.ResponseWriter, r *http.Request)
+	// MarkNotificationRead Marcar un aviso como leído
+	// (POST /notifications/{notificationId}/read)
+	MarkNotificationRead(w http.ResponseWriter, r *http.Request, notificationId openapi_types.UUID)
 	// GetReady El proceso puede atender tráfico (la base de datos responde)
 	// (GET /readyz)
 	GetReady(w http.ResponseWriter, r *http.Request)
+	// ListRescheduleRequests Solicitudes de reagendamiento visibles para quien consulta
+	// (GET /reschedule-requests)
+	ListRescheduleRequests(w http.ResponseWriter, r *http.Request, params ListRescheduleRequestsParams)
+	// DecideRescheduleRequest Aprobar o rechazar una solicitud
+	// (POST /reschedule-requests/{requestId}/decision)
+	DecideRescheduleRequest(w http.ResponseWriter, r *http.Request, requestId openapi_types.UUID)
+	// ListRooms Salas de la academia
+	// (GET /rooms)
+	ListRooms(w http.ResponseWriter, r *http.Request)
+	// ListSessions Sesiones visibles para quien consulta, dentro de un rango
+	// (GET /sessions)
+	ListSessions(w http.ResponseWriter, r *http.Request, params ListSessionsParams)
+	// GetSession Detalle de una sesión
+	// (GET /sessions/{sessionId})
+	GetSession(w http.ResponseWriter, r *http.Request, sessionId SessionId)
+	// GetAttendance Asistencia de una sesión, con un registro por alumno inscrito
+	// (GET /sessions/{sessionId}/attendance)
+	GetAttendance(w http.ResponseWriter, r *http.Request, sessionId SessionId)
+	// SaveAttendance Guardar la asistencia de una sesión
+	// (PUT /sessions/{sessionId}/attendance)
+	SaveAttendance(w http.ResponseWriter, r *http.Request, sessionId SessionId)
+	// CancelSession Cancelar una sesión (profesor o dirección) y avisar a las familias
+	// (POST /sessions/{sessionId}/cancel)
+	CancelSession(w http.ResponseWriter, r *http.Request, sessionId SessionId)
+	// ListRescheduleOptions Horarios libres en que se puede mover la sesión
+	// (GET /sessions/{sessionId}/reschedule-options)
+	ListRescheduleOptions(w http.ResponseWriter, r *http.Request, sessionId SessionId)
+	// CreateRescheduleRequest Proponer un nuevo horario para una sesión
+	// (POST /sessions/{sessionId}/reschedule-requests)
+	CreateRescheduleRequest(w http.ResponseWriter, r *http.Request, sessionId SessionId)
+	// ListTeachers Profesores de la academia
+	// (GET /teachers)
+	ListTeachers(w http.ResponseWriter, r *http.Request)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListClassGroups Grupos de clase visibles para quien consulta
+// (GET /class-groups)
+func (_ Unimplemented) ListClassGroups(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // GetHealth El proceso está vivo
 // (GET /healthz)
@@ -59,9 +468,93 @@ func (_ Unimplemented) GetHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// GetMe Persona autenticada, sus roles y los alumnos a su cargo
+// (GET /me)
+func (_ Unimplemented) GetMe(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListNotifications Avisos dentro de la app
+// (GET /notifications)
+func (_ Unimplemented) ListNotifications(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// MarkNotificationRead Marcar un aviso como leído
+// (POST /notifications/{notificationId}/read)
+func (_ Unimplemented) MarkNotificationRead(w http.ResponseWriter, r *http.Request, notificationId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // GetReady El proceso puede atender tráfico (la base de datos responde)
 // (GET /readyz)
 func (_ Unimplemented) GetReady(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRescheduleRequests Solicitudes de reagendamiento visibles para quien consulta
+// (GET /reschedule-requests)
+func (_ Unimplemented) ListRescheduleRequests(w http.ResponseWriter, r *http.Request, params ListRescheduleRequestsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// DecideRescheduleRequest Aprobar o rechazar una solicitud
+// (POST /reschedule-requests/{requestId}/decision)
+func (_ Unimplemented) DecideRescheduleRequest(w http.ResponseWriter, r *http.Request, requestId openapi_types.UUID) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRooms Salas de la academia
+// (GET /rooms)
+func (_ Unimplemented) ListRooms(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListSessions Sesiones visibles para quien consulta, dentro de un rango
+// (GET /sessions)
+func (_ Unimplemented) ListSessions(w http.ResponseWriter, r *http.Request, params ListSessionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetSession Detalle de una sesión
+// (GET /sessions/{sessionId})
+func (_ Unimplemented) GetSession(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAttendance Asistencia de una sesión, con un registro por alumno inscrito
+// (GET /sessions/{sessionId}/attendance)
+func (_ Unimplemented) GetAttendance(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// SaveAttendance Guardar la asistencia de una sesión
+// (PUT /sessions/{sessionId}/attendance)
+func (_ Unimplemented) SaveAttendance(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CancelSession Cancelar una sesión (profesor o dirección) y avisar a las familias
+// (POST /sessions/{sessionId}/cancel)
+func (_ Unimplemented) CancelSession(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListRescheduleOptions Horarios libres en que se puede mover la sesión
+// (GET /sessions/{sessionId}/reschedule-options)
+func (_ Unimplemented) ListRescheduleOptions(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// CreateRescheduleRequest Proponer un nuevo horario para una sesión
+// (POST /sessions/{sessionId}/reschedule-requests)
+func (_ Unimplemented) CreateRescheduleRequest(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// ListTeachers Profesores de la academia
+// (GET /teachers)
+func (_ Unimplemented) ListTeachers(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -73,6 +566,20 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListClassGroups operation middleware
+func (siw *ServerInterfaceWrapper) ListClassGroups(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListClassGroups(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // GetHealth operation middleware
 func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Request) {
@@ -88,11 +595,354 @@ func (siw *ServerInterfaceWrapper) GetHealth(w http.ResponseWriter, r *http.Requ
 	handler.ServeHTTP(w, r)
 }
 
+// GetMe operation middleware
+func (siw *ServerInterfaceWrapper) GetMe(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMe(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListNotifications operation middleware
+func (siw *ServerInterfaceWrapper) ListNotifications(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListNotifications(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MarkNotificationRead operation middleware
+func (siw *ServerInterfaceWrapper) MarkNotificationRead(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "notificationId" -------------
+	var notificationId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "notificationId", chi.URLParam(r, "notificationId"), &notificationId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "notificationId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MarkNotificationRead(w, r, notificationId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetReady operation middleware
 func (siw *ServerInterfaceWrapper) GetReady(w http.ResponseWriter, r *http.Request) {
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetReady(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRescheduleRequests operation middleware
+func (siw *ServerInterfaceWrapper) ListRescheduleRequests(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListRescheduleRequestsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRescheduleRequests(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DecideRescheduleRequest operation middleware
+func (siw *ServerInterfaceWrapper) DecideRescheduleRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "requestId" -------------
+	var requestId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "requestId", chi.URLParam(r, "requestId"), &requestId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "requestId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DecideRescheduleRequest(w, r, requestId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRooms operation middleware
+func (siw *ServerInterfaceWrapper) ListRooms(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRooms(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSessions operation middleware
+func (siw *ServerInterfaceWrapper) ListSessions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSessionsParams
+
+	// ------------- Required query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSessions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSession operation middleware
+func (siw *ServerInterfaceWrapper) GetSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId SessionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", chi.URLParam(r, "sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSession(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAttendance operation middleware
+func (siw *ServerInterfaceWrapper) GetAttendance(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId SessionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", chi.URLParam(r, "sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAttendance(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SaveAttendance operation middleware
+func (siw *ServerInterfaceWrapper) SaveAttendance(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId SessionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", chi.URLParam(r, "sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SaveAttendance(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelSession operation middleware
+func (siw *ServerInterfaceWrapper) CancelSession(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId SessionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", chi.URLParam(r, "sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelSession(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListRescheduleOptions operation middleware
+func (siw *ServerInterfaceWrapper) ListRescheduleOptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId SessionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", chi.URLParam(r, "sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListRescheduleOptions(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateRescheduleRequest operation middleware
+func (siw *ServerInterfaceWrapper) CreateRescheduleRequest(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sessionId" -------------
+	var sessionId SessionId
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sessionId", chi.URLParam(r, "sessionId"), &sessionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sessionId", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateRescheduleRequest(w, r, sessionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListTeachers operation middleware
+func (siw *ServerInterfaceWrapper) ListTeachers(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTeachers(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -221,8 +1071,84 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/readyz", wrapper.GetReady)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me", wrapper.GetMe)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/rooms", wrapper.ListRooms)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/teachers", wrapper.ListTeachers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/class-groups", wrapper.ListClassGroups)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/sessions", wrapper.ListSessions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/sessions/{sessionId}", wrapper.GetSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/sessions/{sessionId}/cancel", wrapper.CancelSession)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/sessions/{sessionId}/reschedule-options", wrapper.ListRescheduleOptions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/sessions/{sessionId}/reschedule-requests", wrapper.CreateRescheduleRequest)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/reschedule-requests", wrapper.ListRescheduleRequests)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/reschedule-requests/{requestId}/decision", wrapper.DecideRescheduleRequest)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/sessions/{sessionId}/attendance", wrapper.GetAttendance)
+	})
+	r.Group(func(r chi.Router) {
+		r.Put(options.BaseURL+"/sessions/{sessionId}/attendance", wrapper.SaveAttendance)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/notifications", wrapper.ListNotifications)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/notifications/{notificationId}/read", wrapper.MarkNotificationRead)
+	})
 
 	return r
+}
+
+type BadRequestJSONResponse Problem
+
+type ConflictJSONResponse Problem
+
+type ForbiddenJSONResponse Problem
+
+type NotFoundJSONResponse Problem
+
+type PolicyViolationJSONResponse Problem
+
+type ListClassGroupsRequestObject struct {
+}
+
+type ListClassGroupsResponseObject interface {
+	VisitListClassGroupsResponse(w http.ResponseWriter) error
+}
+
+type ListClassGroups200JSONResponse []ClassGroup
+
+func (response ListClassGroups200JSONResponse) VisitListClassGroupsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
 }
 
 type GetHealthRequestObject struct {
@@ -242,6 +1168,78 @@ func (response GetHealth200JSONResponse) VisitGetHealthResponse(w http.ResponseW
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMeRequestObject struct {
+}
+
+type GetMeResponseObject interface {
+	VisitGetMeResponse(w http.ResponseWriter) error
+}
+
+type GetMe200JSONResponse Viewer
+
+func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListNotificationsRequestObject struct {
+}
+
+type ListNotificationsResponseObject interface {
+	VisitListNotificationsResponse(w http.ResponseWriter) error
+}
+
+type ListNotifications200JSONResponse []Notification
+
+func (response ListNotifications200JSONResponse) VisitListNotificationsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MarkNotificationReadRequestObject struct {
+	NotificationId openapi_types.UUID `json:"notificationId"`
+}
+
+type MarkNotificationReadResponseObject interface {
+	VisitMarkNotificationReadResponse(w http.ResponseWriter) error
+}
+
+type MarkNotificationRead204Response struct {
+}
+
+func (response MarkNotificationRead204Response) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type MarkNotificationRead404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response MarkNotificationRead404JSONResponse) VisitMarkNotificationReadResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -281,14 +1279,527 @@ func (response GetReady503JSONResponse) VisitGetReadyResponse(w http.ResponseWri
 	return err
 }
 
+type ListRescheduleRequestsRequestObject struct {
+	Params ListRescheduleRequestsParams
+}
+
+type ListRescheduleRequestsResponseObject interface {
+	VisitListRescheduleRequestsResponse(w http.ResponseWriter) error
+}
+
+type ListRescheduleRequests200JSONResponse []RescheduleRequest
+
+func (response ListRescheduleRequests200JSONResponse) VisitListRescheduleRequestsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideRescheduleRequestRequestObject struct {
+	RequestId openapi_types.UUID `json:"requestId"`
+	Body      *DecideRescheduleRequestJSONRequestBody
+}
+
+type DecideRescheduleRequestResponseObject interface {
+	VisitDecideRescheduleRequestResponse(w http.ResponseWriter) error
+}
+
+type DecideRescheduleRequest200JSONResponse RescheduleRequest
+
+func (response DecideRescheduleRequest200JSONResponse) VisitDecideRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideRescheduleRequest403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response DecideRescheduleRequest403JSONResponse) VisitDecideRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideRescheduleRequest404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response DecideRescheduleRequest404JSONResponse) VisitDecideRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type DecideRescheduleRequest409JSONResponse struct{ ConflictJSONResponse }
+
+func (response DecideRescheduleRequest409JSONResponse) VisitDecideRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRoomsRequestObject struct {
+}
+
+type ListRoomsResponseObject interface {
+	VisitListRoomsResponse(w http.ResponseWriter) error
+}
+
+type ListRooms200JSONResponse []Room
+
+func (response ListRooms200JSONResponse) VisitListRoomsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSessionsRequestObject struct {
+	Params ListSessionsParams
+}
+
+type ListSessionsResponseObject interface {
+	VisitListSessionsResponse(w http.ResponseWriter) error
+}
+
+type ListSessions200JSONResponse []Session
+
+func (response ListSessions200JSONResponse) VisitListSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListSessions400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListSessions400JSONResponse) VisitListSessionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSessionRequestObject struct {
+	SessionId SessionId `json:"sessionId"`
+}
+
+type GetSessionResponseObject interface {
+	VisitGetSessionResponse(w http.ResponseWriter) error
+}
+
+type GetSession200JSONResponse Session
+
+func (response GetSession200JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetSession404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetSession404JSONResponse) VisitGetSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAttendanceRequestObject struct {
+	SessionId SessionId `json:"sessionId"`
+}
+
+type GetAttendanceResponseObject interface {
+	VisitGetAttendanceResponse(w http.ResponseWriter) error
+}
+
+type GetAttendance200JSONResponse []AttendanceRecord
+
+func (response GetAttendance200JSONResponse) VisitGetAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAttendance404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetAttendance404JSONResponse) VisitGetAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveAttendanceRequestObject struct {
+	SessionId SessionId `json:"sessionId"`
+	Body      *SaveAttendanceJSONRequestBody
+}
+
+type SaveAttendanceResponseObject interface {
+	VisitSaveAttendanceResponse(w http.ResponseWriter) error
+}
+
+type SaveAttendance200JSONResponse []AttendanceRecord
+
+func (response SaveAttendance200JSONResponse) VisitSaveAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveAttendance403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response SaveAttendance403JSONResponse) VisitSaveAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveAttendance404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response SaveAttendance404JSONResponse) VisitSaveAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelSessionRequestObject struct {
+	SessionId SessionId `json:"sessionId"`
+	Body      *CancelSessionJSONRequestBody
+}
+
+type CancelSessionResponseObject interface {
+	VisitCancelSessionResponse(w http.ResponseWriter) error
+}
+
+type CancelSession200JSONResponse Session
+
+func (response CancelSession200JSONResponse) VisitCancelSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelSession403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CancelSession403JSONResponse) VisitCancelSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelSession404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CancelSession404JSONResponse) VisitCancelSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CancelSession409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CancelSession409JSONResponse) VisitCancelSessionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRescheduleOptionsRequestObject struct {
+	SessionId SessionId `json:"sessionId"`
+}
+
+type ListRescheduleOptionsResponseObject interface {
+	VisitListRescheduleOptionsResponse(w http.ResponseWriter) error
+}
+
+type ListRescheduleOptions200JSONResponse []RescheduleOption
+
+func (response ListRescheduleOptions200JSONResponse) VisitListRescheduleOptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListRescheduleOptions404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response ListRescheduleOptions404JSONResponse) VisitListRescheduleOptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRescheduleRequestRequestObject struct {
+	SessionId SessionId `json:"sessionId"`
+	Body      *CreateRescheduleRequestJSONRequestBody
+}
+
+type CreateRescheduleRequestResponseObject interface {
+	VisitCreateRescheduleRequestResponse(w http.ResponseWriter) error
+}
+
+type CreateRescheduleRequest201JSONResponse RescheduleRequest
+
+func (response CreateRescheduleRequest201JSONResponse) VisitCreateRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRescheduleRequest403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response CreateRescheduleRequest403JSONResponse) VisitCreateRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRescheduleRequest404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response CreateRescheduleRequest404JSONResponse) VisitCreateRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRescheduleRequest409JSONResponse struct{ ConflictJSONResponse }
+
+func (response CreateRescheduleRequest409JSONResponse) VisitCreateRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type CreateRescheduleRequest422JSONResponse struct{ PolicyViolationJSONResponse }
+
+func (response CreateRescheduleRequest422JSONResponse) VisitCreateRescheduleRequestResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(422)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTeachersRequestObject struct {
+}
+
+type ListTeachersResponseObject interface {
+	VisitListTeachersResponse(w http.ResponseWriter) error
+}
+
+type ListTeachers200JSONResponse []Teacher
+
+func (response ListTeachers200JSONResponse) VisitListTeachersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListClassGroups Grupos de clase visibles para quien consulta
+	// (GET /class-groups)
+	ListClassGroups(ctx context.Context, request ListClassGroupsRequestObject) (ListClassGroupsResponseObject, error)
 	// GetHealth El proceso está vivo
 	// (GET /healthz)
 	GetHealth(ctx context.Context, request GetHealthRequestObject) (GetHealthResponseObject, error)
+	// GetMe Persona autenticada, sus roles y los alumnos a su cargo
+	// (GET /me)
+	GetMe(ctx context.Context, request GetMeRequestObject) (GetMeResponseObject, error)
+	// ListNotifications Avisos dentro de la app
+	// (GET /notifications)
+	ListNotifications(ctx context.Context, request ListNotificationsRequestObject) (ListNotificationsResponseObject, error)
+	// MarkNotificationRead Marcar un aviso como leído
+	// (POST /notifications/{notificationId}/read)
+	MarkNotificationRead(ctx context.Context, request MarkNotificationReadRequestObject) (MarkNotificationReadResponseObject, error)
 	// GetReady El proceso puede atender tráfico (la base de datos responde)
 	// (GET /readyz)
 	GetReady(ctx context.Context, request GetReadyRequestObject) (GetReadyResponseObject, error)
+	// ListRescheduleRequests Solicitudes de reagendamiento visibles para quien consulta
+	// (GET /reschedule-requests)
+	ListRescheduleRequests(ctx context.Context, request ListRescheduleRequestsRequestObject) (ListRescheduleRequestsResponseObject, error)
+	// DecideRescheduleRequest Aprobar o rechazar una solicitud
+	// (POST /reschedule-requests/{requestId}/decision)
+	DecideRescheduleRequest(ctx context.Context, request DecideRescheduleRequestRequestObject) (DecideRescheduleRequestResponseObject, error)
+	// ListRooms Salas de la academia
+	// (GET /rooms)
+	ListRooms(ctx context.Context, request ListRoomsRequestObject) (ListRoomsResponseObject, error)
+	// ListSessions Sesiones visibles para quien consulta, dentro de un rango
+	// (GET /sessions)
+	ListSessions(ctx context.Context, request ListSessionsRequestObject) (ListSessionsResponseObject, error)
+	// GetSession Detalle de una sesión
+	// (GET /sessions/{sessionId})
+	GetSession(ctx context.Context, request GetSessionRequestObject) (GetSessionResponseObject, error)
+	// GetAttendance Asistencia de una sesión, con un registro por alumno inscrito
+	// (GET /sessions/{sessionId}/attendance)
+	GetAttendance(ctx context.Context, request GetAttendanceRequestObject) (GetAttendanceResponseObject, error)
+	// SaveAttendance Guardar la asistencia de una sesión
+	// (PUT /sessions/{sessionId}/attendance)
+	SaveAttendance(ctx context.Context, request SaveAttendanceRequestObject) (SaveAttendanceResponseObject, error)
+	// CancelSession Cancelar una sesión (profesor o dirección) y avisar a las familias
+	// (POST /sessions/{sessionId}/cancel)
+	CancelSession(ctx context.Context, request CancelSessionRequestObject) (CancelSessionResponseObject, error)
+	// ListRescheduleOptions Horarios libres en que se puede mover la sesión
+	// (GET /sessions/{sessionId}/reschedule-options)
+	ListRescheduleOptions(ctx context.Context, request ListRescheduleOptionsRequestObject) (ListRescheduleOptionsResponseObject, error)
+	// CreateRescheduleRequest Proponer un nuevo horario para una sesión
+	// (POST /sessions/{sessionId}/reschedule-requests)
+	CreateRescheduleRequest(ctx context.Context, request CreateRescheduleRequestRequestObject) (CreateRescheduleRequestResponseObject, error)
+	// ListTeachers Profesores de la academia
+	// (GET /teachers)
+	ListTeachers(ctx context.Context, request ListTeachersRequestObject) (ListTeachersResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -330,6 +1841,30 @@ type strictHandler struct {
 	options     StrictHTTPServerOptions
 }
 
+// ListClassGroups operation middleware
+func (sh *strictHandler) ListClassGroups(w http.ResponseWriter, r *http.Request) {
+	var request ListClassGroupsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListClassGroups(ctx, request.(ListClassGroupsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListClassGroups")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListClassGroupsResponseObject); ok {
+		if err := validResponse.VisitListClassGroupsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetHealth operation middleware
 func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	var request GetHealthRequestObject
@@ -354,6 +1889,80 @@ func (sh *strictHandler) GetHealth(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetMe operation middleware
+func (sh *strictHandler) GetMe(w http.ResponseWriter, r *http.Request) {
+	var request GetMeRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetMe(ctx, request.(GetMeRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetMe")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetMeResponseObject); ok {
+		if err := validResponse.VisitGetMeResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListNotifications operation middleware
+func (sh *strictHandler) ListNotifications(w http.ResponseWriter, r *http.Request) {
+	var request ListNotificationsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListNotifications(ctx, request.(ListNotificationsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListNotifications")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListNotificationsResponseObject); ok {
+		if err := validResponse.VisitListNotificationsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MarkNotificationRead operation middleware
+func (sh *strictHandler) MarkNotificationRead(w http.ResponseWriter, r *http.Request, notificationId openapi_types.UUID) {
+	var request MarkNotificationReadRequestObject
+
+	request.NotificationId = notificationId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MarkNotificationRead(ctx, request.(MarkNotificationReadRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MarkNotificationRead")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MarkNotificationReadResponseObject); ok {
+		if err := validResponse.VisitMarkNotificationReadResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // GetReady operation middleware
 func (sh *strictHandler) GetReady(w http.ResponseWriter, r *http.Request) {
 	var request GetReadyRequestObject
@@ -371,6 +1980,316 @@ func (sh *strictHandler) GetReady(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(GetReadyResponseObject); ok {
 		if err := validResponse.VisitGetReadyResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRescheduleRequests operation middleware
+func (sh *strictHandler) ListRescheduleRequests(w http.ResponseWriter, r *http.Request, params ListRescheduleRequestsParams) {
+	var request ListRescheduleRequestsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRescheduleRequests(ctx, request.(ListRescheduleRequestsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRescheduleRequests")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRescheduleRequestsResponseObject); ok {
+		if err := validResponse.VisitListRescheduleRequestsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// DecideRescheduleRequest operation middleware
+func (sh *strictHandler) DecideRescheduleRequest(w http.ResponseWriter, r *http.Request, requestId openapi_types.UUID) {
+	var request DecideRescheduleRequestRequestObject
+
+	request.RequestId = requestId
+
+	var body DecideRescheduleRequestJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.DecideRescheduleRequest(ctx, request.(DecideRescheduleRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "DecideRescheduleRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(DecideRescheduleRequestResponseObject); ok {
+		if err := validResponse.VisitDecideRescheduleRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRooms operation middleware
+func (sh *strictHandler) ListRooms(w http.ResponseWriter, r *http.Request) {
+	var request ListRoomsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRooms(ctx, request.(ListRoomsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRooms")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRoomsResponseObject); ok {
+		if err := validResponse.VisitListRoomsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListSessions operation middleware
+func (sh *strictHandler) ListSessions(w http.ResponseWriter, r *http.Request, params ListSessionsParams) {
+	var request ListSessionsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListSessions(ctx, request.(ListSessionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListSessions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListSessionsResponseObject); ok {
+		if err := validResponse.VisitListSessionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetSession operation middleware
+func (sh *strictHandler) GetSession(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	var request GetSessionRequestObject
+
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetSession(ctx, request.(GetSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetSessionResponseObject); ok {
+		if err := validResponse.VisitGetSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAttendance operation middleware
+func (sh *strictHandler) GetAttendance(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	var request GetAttendanceRequestObject
+
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAttendance(ctx, request.(GetAttendanceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAttendance")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAttendanceResponseObject); ok {
+		if err := validResponse.VisitGetAttendanceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// SaveAttendance operation middleware
+func (sh *strictHandler) SaveAttendance(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	var request SaveAttendanceRequestObject
+
+	request.SessionId = sessionId
+
+	var body SaveAttendanceJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.SaveAttendance(ctx, request.(SaveAttendanceRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "SaveAttendance")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(SaveAttendanceResponseObject); ok {
+		if err := validResponse.VisitSaveAttendanceResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CancelSession operation middleware
+func (sh *strictHandler) CancelSession(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	var request CancelSessionRequestObject
+
+	request.SessionId = sessionId
+
+	var body CancelSessionJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CancelSession(ctx, request.(CancelSessionRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CancelSession")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CancelSessionResponseObject); ok {
+		if err := validResponse.VisitCancelSessionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListRescheduleOptions operation middleware
+func (sh *strictHandler) ListRescheduleOptions(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	var request ListRescheduleOptionsRequestObject
+
+	request.SessionId = sessionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListRescheduleOptions(ctx, request.(ListRescheduleOptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListRescheduleOptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListRescheduleOptionsResponseObject); ok {
+		if err := validResponse.VisitListRescheduleOptionsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// CreateRescheduleRequest operation middleware
+func (sh *strictHandler) CreateRescheduleRequest(w http.ResponseWriter, r *http.Request, sessionId SessionId) {
+	var request CreateRescheduleRequestRequestObject
+
+	request.SessionId = sessionId
+
+	var body CreateRescheduleRequestJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.CreateRescheduleRequest(ctx, request.(CreateRescheduleRequestRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "CreateRescheduleRequest")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(CreateRescheduleRequestResponseObject); ok {
+		if err := validResponse.VisitCreateRescheduleRequestResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ListTeachers operation middleware
+func (sh *strictHandler) ListTeachers(w http.ResponseWriter, r *http.Request) {
+	var request ListTeachersRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListTeachers(ctx, request.(ListTeachersRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListTeachers")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListTeachersResponseObject); ok {
+		if err := validResponse.VisitListTeachersResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

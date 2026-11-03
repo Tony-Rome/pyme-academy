@@ -64,7 +64,7 @@ Configurables por academia (tabla `academy_settings`):
 | Subir materiales | ✔ | ✔ | | |
 | Ver materiales | todo | sus grupos | pupilos | propios |
 
-\* Solo alumnos mayores de la edad que defina la academia.
+\* Solo alumnos con cuenta propia, es decir, mayores de la edad que defina la academia (18 años por defecto). Los menores actúan siempre a través de su apoderado.
 \*\* Si la regla de aprobación lo indica.
 \*\*\* Cuando el alumno es menor y la solicitud la inicia el profesor.
 

@@ -32,6 +32,19 @@ func TestHealth(t *testing.T) {
 	}
 }
 
+func TestUnimplementedEndpointsReturn501(t *testing.T) {
+	h := httpapi.NewRouter(fakeDB{})
+	for _, path := range []string{"/api/v1/me", "/api/v1/rooms", "/api/v1/notifications"} {
+		rec := get(t, h, path)
+		if rec.Code != http.StatusNotImplemented {
+			t.Fatalf("%s: status %d, se esperaba 501", path, rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), `"code":"not_implemented"`) {
+			t.Fatalf("%s: cuerpo inesperado: %s", path, rec.Body.String())
+		}
+	}
+}
+
 func TestReady(t *testing.T) {
 	t.Run("con base de datos", func(t *testing.T) {
 		rec := get(t, httpapi.NewRouter(fakeDB{}), "/api/v1/readyz")

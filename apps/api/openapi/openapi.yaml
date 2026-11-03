@@ -1,10 +1,24 @@
 openapi: 3.0.3
 info:
   title: Music Academy API
-  version: 0.1.0
-  description: API de gestión de academias musicales. Contrato único para web y móvil.
+  version: 0.2.0
+  description: |
+    API de gestión de academias musicales. Contrato único para web y móvil.
+
+    Los endpoints del núcleo de la fase 1 (agenda, reagendamiento, asistencia, avisos)
+    están definidos aquí antes de implementarse: la web se construye contra este
+    contrato con una API simulada, y el backend lo cumple después.
 servers:
   - url: /api/v1
+tags:
+  - name: system
+  - name: me
+  - name: catalog
+  - name: sessions
+  - name: reschedule
+  - name: attendance
+  - name: notifications
+
 paths:
   /healthz:
     get:
@@ -36,7 +50,339 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Health"
+
+  /me:
+    get:
+      operationId: getMe
+      summary: Persona autenticada, sus roles y los alumnos a su cargo
+      tags: [me]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Viewer"
+
+  /rooms:
+    get:
+      operationId: listRooms
+      summary: Salas de la academia
+      tags: [catalog]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Room"
+  /teachers:
+    get:
+      operationId: listTeachers
+      summary: Profesores de la academia
+      tags: [catalog]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Teacher"
+  /class-groups:
+    get:
+      operationId: listClassGroups
+      summary: Grupos de clase visibles para quien consulta
+      tags: [catalog]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ClassGroup"
+
+  /sessions:
+    get:
+      operationId: listSessions
+      summary: Sesiones visibles para quien consulta, dentro de un rango
+      description: |
+        Dirección ve todas. Un profesor ve las suyas. Un apoderado ve las de sus pupilos.
+      tags: [sessions]
+      parameters:
+        - name: from
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+        - name: to
+          in: query
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Session"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /sessions/{sessionId}:
+    get:
+      operationId: getSession
+      summary: Detalle de una sesión
+      tags: [sessions]
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /sessions/{sessionId}/cancel:
+    post:
+      operationId: cancelSession
+      summary: Cancelar una sesión (profesor o dirección) y avisar a las familias
+      tags: [sessions]
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CancelInput"
+      responses:
+        "200":
+          description: Sesión cancelada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Session"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /sessions/{sessionId}/reschedule-options:
+    get:
+      operationId: listRescheduleOptions
+      summary: Horarios libres en que se puede mover la sesión
+      description: Solo ofrece horarios sin choque de sala ni de profesor que respetan las reglas de la academia.
+      tags: [reschedule]
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RescheduleOption"
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /sessions/{sessionId}/reschedule-requests:
+    post:
+      operationId: createRescheduleRequest
+      summary: Proponer un nuevo horario para una sesión
+      tags: [reschedule]
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RescheduleRequestInput"
+      responses:
+        "201":
+          description: Solicitud creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescheduleRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/PolicyViolation"
+  /reschedule-requests:
+    get:
+      operationId: listRescheduleRequests
+      summary: Solicitudes de reagendamiento visibles para quien consulta
+      tags: [reschedule]
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/RescheduleStatus"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/RescheduleRequest"
+  /reschedule-requests/{requestId}/decision:
+    post:
+      operationId: decideRescheduleRequest
+      summary: Aprobar o rechazar una solicitud
+      tags: [reschedule]
+      parameters:
+        - name: requestId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DecisionInput"
+      responses:
+        "200":
+          description: Solicitud resuelta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RescheduleRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /sessions/{sessionId}/attendance:
+    get:
+      operationId: getAttendance
+      summary: Asistencia de una sesión, con un registro por alumno inscrito
+      tags: [attendance]
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    put:
+      operationId: saveAttendance
+      summary: Guardar la asistencia de una sesión
+      tags: [attendance]
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttendanceInput"
+      responses:
+        "200":
+          description: Asistencia guardada
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceRecord"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /notifications:
+    get:
+      operationId: listNotifications
+      summary: Avisos dentro de la app
+      tags: [notifications]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Notification"
+  /notifications/{notificationId}/read:
+    post:
+      operationId: markNotificationRead
+      summary: Marcar un aviso como leído
+      tags: [notifications]
+      parameters:
+        - name: notificationId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "204":
+          description: Marcado
+        "404":
+          $ref: "#/components/responses/NotFound"
+
 components:
+  parameters:
+    SessionId:
+      name: sessionId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Solicitud inválida
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Forbidden:
+      description: No tiene permiso para esta acción
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: No existe o no es visible para quien consulta
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: Choque de sala o de profesor, o el estado ya cambió
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    PolicyViolation:
+      description: Incumple una regla de la academia (anticipación mínima, tope mensual)
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
   schemas:
     Health:
       type: object
@@ -45,3 +391,223 @@ components:
         status:
           type: string
           enum: [ok, unavailable]
+
+    Problem:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: Código estable para que el cliente decida qué mostrar
+          example: room_conflict
+        message:
+          type: string
+
+    Role:
+      type: string
+      enum: [director, teacher, guardian, student]
+
+    StudentRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+
+    Viewer:
+      type: object
+      required: [id, fullName, roles, activeRole, students]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        roles:
+          type: array
+          items: { $ref: "#/components/schemas/Role" }
+        activeRole: { $ref: "#/components/schemas/Role" }
+        students:
+          type: array
+          description: Alumnos a cargo (apoderado) o la propia persona (alumno adulto)
+          items: { $ref: "#/components/schemas/StudentRef" }
+
+    Room:
+      type: object
+      required: [id, name, capacity]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        capacity: { type: integer, minimum: 1 }
+
+    Teacher:
+      type: object
+      required: [id, fullName, instruments]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        instruments:
+          type: array
+          items: { type: string }
+
+    GroupKind:
+      type: string
+      enum: [individual, group]
+
+    ClassGroup:
+      type: object
+      required: [id, name, instrument, level, kind, teacherId, weekday, startTime, durationMinutes, capacity, enrolled]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        instrument: { type: string }
+        level: { type: string }
+        kind: { $ref: "#/components/schemas/GroupKind" }
+        teacherId: { type: string, format: uuid }
+        roomId: { type: string, format: uuid, nullable: true }
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = domingo
+        startTime:
+          type: string
+          example: "16:00"
+        durationMinutes: { type: integer, minimum: 1 }
+        capacity: { type: integer, minimum: 1 }
+        enrolled: { type: integer, minimum: 0 }
+
+    SessionStatus:
+      type: string
+      enum: [scheduled, completed, cancelled]
+
+    Session:
+      type: object
+      required: [id, classGroupId, groupName, instrument, teacherId, teacherName, startsAt, endsAt, status, students]
+      properties:
+        id: { type: string, format: uuid }
+        classGroupId: { type: string, format: uuid }
+        groupName: { type: string }
+        instrument: { type: string }
+        teacherId: { type: string, format: uuid }
+        teacherName: { type: string }
+        originalTeacherId:
+          type: string
+          format: uuid
+          nullable: true
+          description: Profesor titular cuando la sesión tiene reemplazo
+        originalTeacherName: { type: string, nullable: true }
+        roomId: { type: string, format: uuid, nullable: true }
+        roomName: { type: string, nullable: true }
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        status: { $ref: "#/components/schemas/SessionStatus" }
+        cancelReason: { type: string, nullable: true }
+        students:
+          type: array
+          description: Alumnos inscritos. Un apoderado solo ve a sus pupilos.
+          items: { $ref: "#/components/schemas/StudentRef" }
+        pendingRescheduleRequestId:
+          type: string
+          format: uuid
+          nullable: true
+
+    CancelInput:
+      type: object
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1 }
+
+    RescheduleStatus:
+      type: string
+      enum: [pending, approved, rejected, cancelled, expired]
+
+    RescheduleOption:
+      type: object
+      required: [startsAt, endsAt]
+      properties:
+        startsAt: { type: string, format: date-time }
+        endsAt: { type: string, format: date-time }
+        roomId: { type: string, format: uuid, nullable: true }
+        roomName: { type: string, nullable: true }
+
+    RescheduleRequestInput:
+      type: object
+      required: [proposedStartsAt, proposedEndsAt]
+      properties:
+        proposedStartsAt: { type: string, format: date-time }
+        proposedEndsAt: { type: string, format: date-time }
+        proposedRoomId: { type: string, format: uuid, nullable: true }
+        reason: { type: string, nullable: true }
+
+    RescheduleRequest:
+      type: object
+      required: [id, sessionId, groupName, requestedById, requestedByName, originalStartsAt, originalEndsAt, proposedStartsAt, proposedEndsAt, status, createdAt, expiresAt]
+      properties:
+        id: { type: string, format: uuid }
+        sessionId: { type: string, format: uuid }
+        groupName: { type: string }
+        requestedById: { type: string, format: uuid }
+        requestedByName: { type: string }
+        originalStartsAt: { type: string, format: date-time }
+        originalEndsAt: { type: string, format: date-time }
+        proposedStartsAt: { type: string, format: date-time }
+        proposedEndsAt: { type: string, format: date-time }
+        proposedRoomId: { type: string, format: uuid, nullable: true }
+        proposedRoomName: { type: string, nullable: true }
+        reason: { type: string, nullable: true }
+        status: { $ref: "#/components/schemas/RescheduleStatus" }
+        decisionNote: { type: string, nullable: true }
+        decidedByName: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        expiresAt: { type: string, format: date-time }
+
+    DecisionInput:
+      type: object
+      required: [decision]
+      properties:
+        decision:
+          type: string
+          enum: [approve, reject]
+        note: { type: string, nullable: true }
+
+    AttendanceStatus:
+      type: string
+      enum: [present, absent, late, excused]
+
+    AttendanceRecord:
+      type: object
+      required: [studentId, fullName]
+      properties:
+        studentId: { type: string, format: uuid }
+        fullName: { type: string }
+        status:
+          allOf:
+            - $ref: "#/components/schemas/AttendanceStatus"
+          nullable: true
+          description: null mientras no se haya marcado
+        note: { type: string, nullable: true }
+
+    AttendanceInput:
+      type: object
+      required: [records]
+      properties:
+        records:
+          type: array
+          items:
+            type: object
+            required: [studentId, status]
+            properties:
+              studentId: { type: string, format: uuid }
+              status: { $ref: "#/components/schemas/AttendanceStatus" }
+              note: { type: string, nullable: true }
+
+    Notification:
+      type: object
+      required: [id, type, title, body, createdAt]
+      properties:
+        id: { type: string, format: uuid }
+        type:
+          type: string
+          example: session_moved
+        title: { type: string }
+        body: { type: string }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: string, format: date-time, nullable: true }

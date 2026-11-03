@@ -3,6 +3,9 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -29,11 +32,29 @@ func NewRouter(db Pinger) http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID, middleware.RealIP, middleware.Recoverer)
 
-	strict := api.NewStrictHandler(s, nil)
+	strict := api.NewStrictHandlerWithOptions(s, nil, api.StrictHTTPServerOptions{
+		RequestErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
+			writeProblem(w, http.StatusBadRequest, "bad_request", err.Error())
+		},
+		ResponseErrorHandlerFunc: func(w http.ResponseWriter, r *http.Request, err error) {
+			if errors.Is(err, ErrNotImplemented) {
+				writeProblem(w, http.StatusNotImplemented, "not_implemented", "Este endpoint aún no está implementado")
+				return
+			}
+			slog.Error("error al responder", "path", r.URL.Path, "error", err)
+			writeProblem(w, http.StatusInternalServerError, "internal_error", "Error interno")
+		},
+	})
 	return api.HandlerWithOptions(strict, api.ChiServerOptions{
 		BaseURL:    "/api/v1",
 		BaseRouter: r,
 	})
+}
+
+func writeProblem(w http.ResponseWriter, status int, code, message string) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(api.Problem{Code: code, Message: message})
 }
 
 func (s *Server) GetHealth(context.Context, api.GetHealthRequestObject) (api.GetHealthResponseObject, error) {
