@@ -1,0 +1,38 @@
+:root {
+  --bg: #ffffff;
+  --text: #1c1b1f;
+  --ok: #1a7f37;
+  --down: #b3261e;
+  --checking: #6b6b6b;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #141414;
+    --text: #ececec;
+    --ok: #4cc26b;
+    --down: #ff8a80;
+    --checking: #a0a0a0;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, sans-serif;
+}
+
+main {
+  max-width: 40rem;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+
+.status {
+  font-weight: 600;
+}
+.status-ok { color: var(--ok); }
+.status-down { color: var(--down); }
+.status-checking { color: var(--checking); }

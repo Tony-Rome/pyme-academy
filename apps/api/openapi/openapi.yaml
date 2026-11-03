@@ -1,0 +1,47 @@
+openapi: 3.0.3
+info:
+  title: Music Academy API
+  version: 0.1.0
+  description: API de gestión de academias musicales. Contrato único para web y móvil.
+servers:
+  - url: /api/v1
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      summary: El proceso está vivo
+      tags: [system]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+  /readyz:
+    get:
+      operationId: getReady
+      summary: El proceso puede atender tráfico (la base de datos responde)
+      tags: [system]
+      responses:
+        "200":
+          description: Listo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+        "503":
+          description: No está listo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Health"
+components:
+  schemas:
+    Health:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]

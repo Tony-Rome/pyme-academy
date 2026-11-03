@@ -1,0 +1,14 @@
+{
+  "name": "music-academy",
+  "private": true,
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "generate": "npm run generate -w @music-academy/api-client",
+    "dev:web": "npm run dev -w @music-academy/web",
+    "build:web": "npm run build -w @music-academy/web",
+    "typecheck": "npm run typecheck -w @music-academy/api-client && npm run typecheck -w @music-academy/web"
+  }
+}

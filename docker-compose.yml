@@ -1,0 +1,19 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: musicacademy
+      POSTGRES_PASSWORD: musicacademy
+      POSTGRES_DB: musicacademy
+    ports:
+      - "5433:5432"   # 5433 en el host para no chocar con otro Postgres local
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U musicacademy"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  pgdata:

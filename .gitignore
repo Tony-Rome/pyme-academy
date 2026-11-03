@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+apps/api/bin/
+apps/api/*.exe
+.DS_Store
+.idea/
+.vscode/
