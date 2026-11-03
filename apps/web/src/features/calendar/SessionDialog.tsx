@@ -1,5 +1,7 @@
-import { Clock, DoorOpen, GraduationCap, Users } from "lucide-react";
+import { CalendarClock, Clock, DoorOpen, GraduationCap, Users } from "lucide-react";
+import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -19,9 +21,10 @@ const STATUS_LABELS = {
 interface Props {
   session: Session | null;
   onClose: () => void;
+  onReschedule: (session: Session) => void;
 }
 
-export function SessionDialog({ session, onClose }: Props) {
+export function SessionDialog({ session, onClose, onReschedule }: Props) {
   return (
     <Dialog open={!!session} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
@@ -70,6 +73,24 @@ export function SessionDialog({ session, onClose }: Props) {
                   : "Sin alumnos inscritos"}
               </Row>
             </dl>
+
+            {session.pendingRescheduleRequestId && (
+              <Link to="/solicitudes" className="text-sm underline" onClick={onClose}>
+                Ver la solicitud de cambio pendiente
+              </Link>
+            )}
+
+            {(session.canReschedule || session.rescheduleBlockedReason) && (
+              <div className="space-y-1.5">
+                <Button disabled={!session.canReschedule} onClick={() => onReschedule(session)}>
+                  <CalendarClock data-icon="inline-start" />
+                  Cambiar horario
+                </Button>
+                {session.rescheduleBlockedReason && (
+                  <p className="text-xs text-muted-foreground">{session.rescheduleBlockedReason}</p>
+                )}
+              </div>
+            )}
           </>
         )}
       </DialogContent>

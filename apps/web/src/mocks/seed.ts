@@ -5,6 +5,9 @@ import type { Role, SessionStatus } from "@/lib/types";
 export interface MockUser {
   id: string;
   fullName: string;
+  /** Solo para la API simulada: cuentas de demostración, nunca credenciales reales. */
+  email: string;
+  password: string;
   role: Role;
   /** Alumnos a cargo (apoderado). */
   studentIds: string[];
@@ -59,6 +62,8 @@ export interface MockRequest {
   id: string;
   sessionId: string;
   requestedById: string;
+  originalStartsAt: string;
+  originalEndsAt: string;
   proposedStartsAt: string;
   proposedEndsAt: string;
   proposedRoomId: string | null;
@@ -124,9 +129,9 @@ const s = (index: number) => ID.student(index + 1);
 
 /** Personas con las que se puede "entrar" a la demo (selector de rol). */
 export const users: MockUser[] = [
-  { id: ID.user(1), fullName: "Laura Fuentes", role: "director", studentIds: [] },
-  { id: teachers[0].id, fullName: teachers[0].fullName, role: "teacher", studentIds: [] },
-  { id: ID.user(3), fullName: "Andrea Muñoz", role: "guardian", studentIds: [s(0), s(1)] },
+  { id: ID.user(1), fullName: "Laura Fuentes", email: "laura@academia.test", password: "demo1234", role: "director", studentIds: [] },
+  { id: teachers[0].id, fullName: teachers[0].fullName, email: "camila@academia.test", password: "demo1234", role: "teacher", studentIds: [] },
+  { id: ID.user(3), fullName: "Andrea Muñoz", email: "andrea@academia.test", password: "demo1234", role: "guardian", studentIds: [s(0), s(1)] },
 ];
 
 export const groups: MockGroup[] = [
@@ -210,6 +215,8 @@ export function buildSeed(now = new Date()): SeedData {
     id: ID.request(1),
     sessionId: target.id,
     requestedById: ID.user(3),
+    originalStartsAt: target.startsAt,
+    originalEndsAt: target.endsAt,
     proposedStartsAt: proposedStart.toISOString(),
     proposedEndsAt: proposedEnd.toISOString(),
     proposedRoomId: ID.room(1),

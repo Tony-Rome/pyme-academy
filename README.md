@@ -61,7 +61,7 @@ Web:
 npm run dev:web
 ```
 
-Abre http://localhost:5173. Por defecto la web usa **datos de ejemplo** (API simulada en la propia página, sin necesitar la API ni Postgres): la insignia de la cabecera dice "Datos de ejemplo" y el selector de al lado permite ver la aplicación como dirección, profesor o apoderado.
+Abre http://localhost:5173. Por defecto la web usa **datos de ejemplo** (API simulada en la propia página, sin necesitar la API ni Postgres): la insignia de la cabecera dice "Datos de ejemplo". Sin sesión, cualquier ruta lleva a la pantalla de acceso (`/entrar`), que en este modo ofrece tres cuentas de demostración (dirección, profesor y apoderado; contraseña `demo1234`). Eligiendo una se rellena el formulario y se entra con «Entrar». Son cuentas de mentira que solo existen en la simulación.
 
 Para hablar con la API real, cambia `VITE_MOCK_API` a `false` en `apps/web/.env.development` (o crea `apps/web/.env.development.local` con ese valor, que Git ignora) y levanta la API como se indica arriba. La web usa un proxy hacia `localhost:8080` y la insignia debe decir "Conectado". Los endpoints nuevos del contrato responden 501 hasta que se implementen.
 

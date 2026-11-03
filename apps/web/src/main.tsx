@@ -1,12 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { App } from "./App";
+import { NoticeProvider } from "./components/Notice";
+import { queryClient } from "./lib/queryClient";
 import "./styles.css";
-
-const queryClient = new QueryClient({
-  defaultOptions: { queries: { staleTime: 30_000, refetchOnWindowFocus: false } },
-});
 
 // Sigue el tema del sistema (el tema oscuro de shadcn usa la clase "dark").
 const prefersDark = window.matchMedia("(prefers-color-scheme: dark)");
@@ -17,7 +15,9 @@ prefersDark.addEventListener("change", applyTheme);
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <App />
+      <NoticeProvider>
+        <App />
+      </NoticeProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

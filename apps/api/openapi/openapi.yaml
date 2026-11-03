@@ -10,8 +10,11 @@ info:
     contrato con una API simulada, y el backend lo cumple después.
 servers:
   - url: /api/v1
+security:
+  - cookieAuth: []
 tags:
   - name: system
+  - name: auth
   - name: me
   - name: catalog
   - name: sessions
@@ -23,6 +26,7 @@ paths:
   /healthz:
     get:
       operationId: getHealth
+      security: []
       summary: El proceso está vivo
       tags: [system]
       responses:
@@ -35,6 +39,7 @@ paths:
   /readyz:
     get:
       operationId: getReady
+      security: []
       summary: El proceso puede atender tráfico (la base de datos responde)
       tags: [system]
       responses:
@@ -51,6 +56,44 @@ paths:
               schema:
                 $ref: "#/components/schemas/Health"
 
+  /auth/login:
+    post:
+      operationId: login
+      summary: Iniciar sesión con correo y contraseña
+      description: |
+        Si las credenciales son correctas, el servidor abre la sesión con una cookie
+        `session` (HttpOnly, SameSite=Lax) y devuelve el perfil. El cliente no maneja tokens.
+      tags: [auth]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginInput"
+      responses:
+        "200":
+          description: Sesión abierta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Viewer"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          description: Correo o contraseña incorrectos (no se indica cuál de los dos)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Problem" }
+  /auth/logout:
+    post:
+      operationId: logout
+      summary: Cerrar la sesión actual
+      tags: [auth]
+      responses:
+        "204":
+          description: Sesión cerrada (también si ya estaba cerrada)
+
   /me:
     get:
       operationId: getMe
@@ -63,6 +106,8 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Viewer"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /rooms:
     get:
@@ -349,6 +394,15 @@ paths:
           $ref: "#/components/responses/NotFound"
 
 components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session
+      description: |
+        Sesión abierta con `POST /auth/login`. Todos los endpoints la exigen salvo los
+        de salud y el inicio de sesión; sin ella responden 401 con el código `unauthenticated`.
+
   parameters:
     SessionId:
       name: sessionId
@@ -357,6 +411,11 @@ components:
       schema: { type: string, format: uuid }
 
   responses:
+    Unauthorized:
+      description: No hay sesión abierta o expiró
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Problem" }
     BadRequest:
       description: Solicitud inválida
       content:
@@ -402,6 +461,13 @@ components:
           example: room_conflict
         message:
           type: string
+
+    LoginInput:
+      type: object
+      required: [email, password]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
 
     Role:
       type: string
@@ -480,7 +546,7 @@ components:
 
     Session:
       type: object
-      required: [id, classGroupId, groupName, instrument, teacherId, teacherName, startsAt, endsAt, status, students]
+      required: [id, classGroupId, groupName, instrument, teacherId, teacherName, startsAt, endsAt, status, students, canReschedule]
       properties:
         id: { type: string, format: uuid }
         classGroupId: { type: string, format: uuid }
@@ -508,6 +574,17 @@ components:
           type: string
           format: uuid
           nullable: true
+        canReschedule:
+          type: boolean
+          description: |
+            Quien consulta puede proponer o aplicar un cambio de horario ahora.
+            Las reglas viven en el servidor; el cliente solo las muestra.
+        rescheduleBlockedReason:
+          type: string
+          nullable: true
+          description: |
+            Si quien consulta tendría permiso pero una regla de la academia lo impide
+            (anticipación mínima, tope mensual), explica por qué. null en cualquier otro caso.
 
     CancelInput:
       type: object
@@ -539,7 +616,7 @@ components:
 
     RescheduleRequest:
       type: object
-      required: [id, sessionId, groupName, requestedById, requestedByName, originalStartsAt, originalEndsAt, proposedStartsAt, proposedEndsAt, status, createdAt, expiresAt]
+      required: [id, sessionId, groupName, requestedById, requestedByName, originalStartsAt, originalEndsAt, proposedStartsAt, proposedEndsAt, status, createdAt, expiresAt, viewerCanDecide]
       properties:
         id: { type: string, format: uuid }
         sessionId: { type: string, format: uuid }
@@ -558,6 +635,9 @@ components:
         decidedByName: { type: string, nullable: true }
         createdAt: { type: string, format: date-time }
         expiresAt: { type: string, format: date-time }
+        viewerCanDecide:
+          type: boolean
+          description: Quien consulta puede aprobar o rechazar esta solicitud ahora.
 
     DecisionInput:
       type: object

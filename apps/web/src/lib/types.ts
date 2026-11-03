@@ -12,3 +12,5 @@ export type Session = Schemas["Session"];
 export type SessionStatus = Schemas["SessionStatus"];
 export type RescheduleRequest = Schemas["RescheduleRequest"];
 export type Notification = Schemas["Notification"];
+export type RescheduleOption = Schemas["RescheduleOption"];
+export type RescheduleStatus = Schemas["RescheduleStatus"];

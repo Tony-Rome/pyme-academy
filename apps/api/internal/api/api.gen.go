@@ -234,6 +234,12 @@ type Health struct {
 // HealthStatus defines model for Health.Status.
 type HealthStatus string
 
+// LoginInput defines model for LoginInput.
+type LoginInput struct {
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+}
+
 // Notification defines model for Notification.
 type Notification struct {
 	Body      string             `json:"body"`
@@ -282,6 +288,9 @@ type RescheduleRequest struct {
 	RequestedByName  string              `json:"requestedByName"`
 	SessionId        openapi_types.UUID  `json:"sessionId"`
 	Status           RescheduleStatus    `json:"status"`
+
+	// ViewerCanDecide Quien consulta puede aprobar o rechazar esta solicitud ahora.
+	ViewerCanDecide bool `json:"viewerCanDecide"`
 }
 
 // RescheduleRequestInput defines model for RescheduleRequestInput.
@@ -307,21 +316,28 @@ type Room struct {
 
 // Session defines model for Session.
 type Session struct {
-	CancelReason *string            `json:"cancelReason,omitempty"`
-	ClassGroupId openapi_types.UUID `json:"classGroupId"`
-	EndsAt       time.Time          `json:"endsAt"`
-	GroupName    string             `json:"groupName"`
-	Id           openapi_types.UUID `json:"id"`
-	Instrument   string             `json:"instrument"`
+	// CanReschedule Quien consulta puede proponer o aplicar un cambio de horario ahora.
+	// Las reglas viven en el servidor; el cliente solo las muestra.
+	CanReschedule bool               `json:"canReschedule"`
+	CancelReason  *string            `json:"cancelReason,omitempty"`
+	ClassGroupId  openapi_types.UUID `json:"classGroupId"`
+	EndsAt        time.Time          `json:"endsAt"`
+	GroupName     string             `json:"groupName"`
+	Id            openapi_types.UUID `json:"id"`
+	Instrument    string             `json:"instrument"`
 
 	// OriginalTeacherId Profesor titular cuando la sesión tiene reemplazo
 	OriginalTeacherId          *openapi_types.UUID `json:"originalTeacherId,omitempty"`
 	OriginalTeacherName        *string             `json:"originalTeacherName,omitempty"`
 	PendingRescheduleRequestId *openapi_types.UUID `json:"pendingRescheduleRequestId,omitempty"`
-	RoomId                     *openapi_types.UUID `json:"roomId,omitempty"`
-	RoomName                   *string             `json:"roomName,omitempty"`
-	StartsAt                   time.Time           `json:"startsAt"`
-	Status                     SessionStatus       `json:"status"`
+
+	// RescheduleBlockedReason Si quien consulta tendría permiso pero una regla de la academia lo impide
+	// (anticipación mínima, tope mensual), explica por qué. null en cualquier otro caso.
+	RescheduleBlockedReason *string             `json:"rescheduleBlockedReason,omitempty"`
+	RoomId                  *openapi_types.UUID `json:"roomId,omitempty"`
+	RoomName                *string             `json:"roomName,omitempty"`
+	StartsAt                time.Time           `json:"startsAt"`
+	Status                  SessionStatus       `json:"status"`
 
 	// Students Alumnos inscritos. Un apoderado solo ve a sus pupilos.
 	Students    []StudentRef       `json:"students"`
@@ -374,6 +390,9 @@ type NotFound = Problem
 // PolicyViolation defines model for PolicyViolation.
 type PolicyViolation = Problem
 
+// Unauthorized defines model for Unauthorized.
+type Unauthorized = Problem
+
 // ListRescheduleRequestsParams defines parameters for ListRescheduleRequests.
 type ListRescheduleRequestsParams struct {
 	Status *RescheduleStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -384,6 +403,9 @@ type ListSessionsParams struct {
 	From time.Time `form:"from" json:"from"`
 	To   time.Time `form:"to" json:"to"`
 }
+
+// LoginJSONRequestBody defines body for Login for application/json ContentType.
+type LoginJSONRequestBody = LoginInput
 
 // DecideRescheduleRequestJSONRequestBody defines body for DecideRescheduleRequest for application/json ContentType.
 type DecideRescheduleRequestJSONRequestBody = DecisionInput
@@ -399,6 +421,12 @@ type CreateRescheduleRequestJSONRequestBody = RescheduleRequestInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// Login Iniciar sesión con correo y contraseña
+	// (POST /auth/login)
+	Login(w http.ResponseWriter, r *http.Request)
+	// Logout Cerrar la sesión actual
+	// (POST /auth/logout)
+	Logout(w http.ResponseWriter, r *http.Request)
 	// ListClassGroups Grupos de clase visibles para quien consulta
 	// (GET /class-groups)
 	ListClassGroups(w http.ResponseWriter, r *http.Request)
@@ -455,6 +483,18 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// Login Iniciar sesión con correo y contraseña
+// (POST /auth/login)
+func (_ Unimplemented) Login(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Logout Cerrar la sesión actual
+// (POST /auth/logout)
+func (_ Unimplemented) Logout(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // ListClassGroups Grupos de clase visibles para quien consulta
 // (GET /class-groups)
@@ -566,6 +606,34 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// Login operation middleware
+func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Login(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// Logout operation middleware
+func (siw *ServerInterfaceWrapper) Logout(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.Logout(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListClassGroups operation middleware
 func (siw *ServerInterfaceWrapper) ListClassGroups(w http.ResponseWriter, r *http.Request) {
@@ -1072,6 +1140,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/readyz", wrapper.GetReady)
 	})
 	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/login", wrapper.Login)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/auth/logout", wrapper.Logout)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me", wrapper.GetMe)
 	})
 	r.Group(func(r chi.Router) {
@@ -1129,6 +1203,73 @@ type ForbiddenJSONResponse Problem
 type NotFoundJSONResponse Problem
 
 type PolicyViolationJSONResponse Problem
+
+type UnauthorizedJSONResponse Problem
+
+type LoginRequestObject struct {
+	Body *LoginJSONRequestBody
+}
+
+type LoginResponseObject interface {
+	VisitLoginResponse(w http.ResponseWriter) error
+}
+
+type Login200JSONResponse Viewer
+
+func (response Login200JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response Login400JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type Login401JSONResponse Problem
+
+func (response Login401JSONResponse) VisitLoginResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type LogoutRequestObject struct {
+}
+
+type LogoutResponseObject interface {
+	VisitLogoutResponse(w http.ResponseWriter) error
+}
+
+type Logout204Response struct {
+}
+
+func (response Logout204Response) VisitLogoutResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
 
 type ListClassGroupsRequestObject struct {
 }
@@ -1189,6 +1330,20 @@ func (response GetMe200JSONResponse) VisitGetMeResponse(w http.ResponseWriter) e
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetMe401JSONResponse struct{ UnauthorizedJSONResponse }
+
+func (response GetMe401JSONResponse) VisitGetMeResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(401)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -1749,6 +1904,12 @@ func (response ListTeachers200JSONResponse) VisitListTeachersResponse(w http.Res
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// Login Iniciar sesión con correo y contraseña
+	// (POST /auth/login)
+	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
+	// Logout Cerrar la sesión actual
+	// (POST /auth/logout)
+	Logout(ctx context.Context, request LogoutRequestObject) (LogoutResponseObject, error)
 	// ListClassGroups Grupos de clase visibles para quien consulta
 	// (GET /class-groups)
 	ListClassGroups(ctx context.Context, request ListClassGroupsRequestObject) (ListClassGroupsResponseObject, error)
@@ -1839,6 +2000,61 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// Login operation middleware
+func (sh *strictHandler) Login(w http.ResponseWriter, r *http.Request) {
+	var request LoginRequestObject
+
+	var body LoginJSONRequestBody
+	if err := runtime.BindJSONBody(r, &body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Login(ctx, request.(LoginRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Login")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LoginResponseObject); ok {
+		if err := validResponse.VisitLoginResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// Logout operation middleware
+func (sh *strictHandler) Logout(w http.ResponseWriter, r *http.Request) {
+	var request LogoutRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.Logout(ctx, request.(LogoutRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "Logout")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(LogoutResponseObject); ok {
+		if err := validResponse.VisitLogoutResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // ListClassGroups operation middleware

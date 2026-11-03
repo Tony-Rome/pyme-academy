@@ -9,6 +9,7 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { instrumentKey } from "@/lib/format";
 import type { Session } from "@/lib/types";
+import { RescheduleDialog } from "@/features/reschedule/RescheduleDialog";
 import { SessionDialog } from "./SessionDialog";
 import { useSessions, type DateRange } from "./useSessions";
 
@@ -84,6 +85,8 @@ export function CalendarPage() {
   const sessions = useSessions(range);
   const events = useMemo(() => (sessions.data ?? []).map(toEvent), [sessions.data]);
   const selected = sessions.data?.find((s) => s.id === selectedId) ?? null;
+  const [reschedulingId, setReschedulingId] = useState<string | null>(null);
+  const rescheduling = sessions.data?.find((s) => s.id === reschedulingId) ?? null;
 
   // La vista de semana muestra solo las horas con clases (con un margen), para no
   // dejar la mañana vacía en academias que enseñan por la tarde.
@@ -188,7 +191,15 @@ export function CalendarPage() {
         />
       </div>
 
-      <SessionDialog session={selected} onClose={() => setSelectedId(null)} />
+      <SessionDialog
+        session={selected}
+        onClose={() => setSelectedId(null)}
+        onReschedule={(s) => {
+          setSelectedId(null);
+          setReschedulingId(s.id);
+        }}
+      />
+      <RescheduleDialog session={rescheduling} onClose={() => setReschedulingId(null)} />
     </div>
   );
 }

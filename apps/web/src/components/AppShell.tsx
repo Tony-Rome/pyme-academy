@@ -1,13 +1,27 @@
-import { CalendarDays, Music } from "lucide-react";
+import { CalendarDays, Inbox, LogOut, Music } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 import { ApiStatus } from "@/components/ApiStatus";
-import { RoleSwitcher } from "@/features/viewer/RoleSwitcher";
-import { MOCK_API } from "@/lib/env";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { useLogout } from "@/features/auth/hooks";
+import { useRequests } from "@/features/reschedule/hooks";
+import { useViewer } from "@/features/viewer/useViewer";
+import { ROLE_LABELS } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
-const NAV = [{ to: "/calendario", label: "Calendario", icon: CalendarDays }];
+const NAV = [
+  { to: "/calendario", label: "Calendario", icon: CalendarDays },
+  { to: "/solicitudes", label: "Solicitudes", icon: Inbox },
+];
 
 export function AppShell() {
+  const viewer = useViewer().data;
+  const logout = useLogout();
+
+  // Solo se cuentan las solicitudes que esta persona puede resolver.
+  const pending = useRequests("pending");
+  const actionable = pending.data?.filter((r) => r.viewerCanDecide).length ?? 0;
+
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="sticky top-0 z-20 border-b bg-background/95 backdrop-blur">
@@ -31,13 +45,32 @@ export function AppShell() {
               >
                 <Icon className="size-4" aria-hidden />
                 {label}
+                {to === "/solicitudes" && actionable > 0 && (
+                  <Badge aria-label={`${actionable} por resolver`}>{actionable}</Badge>
+                )}
               </NavLink>
             ))}
           </nav>
 
           <div className="ml-auto flex items-center gap-2">
             <ApiStatus />
-            {import.meta.env.DEV && MOCK_API && <RoleSwitcher />}
+            {viewer && (
+              <>
+                <div className="text-right text-sm leading-tight">
+                  <div className="font-medium">{viewer.fullName}</div>
+                  <div className="text-xs text-muted-foreground">{ROLE_LABELS[viewer.activeRole]}</div>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={logout.isPending}
+                  onClick={() => logout.mutate()}
+                >
+                  <LogOut data-icon="inline-start" />
+                  Salir
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>

@@ -38,6 +38,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Iniciar sesión con correo y contraseña
+         * @description Si las credenciales son correctas, el servidor abre la sesión con una cookie
+         *     `session` (HttpOnly, SameSite=Lax) y devuelve el perfil. El cliente no maneja tokens.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Cerrar la sesión actual */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me": {
         parameters: {
             query?: never;
@@ -299,6 +337,11 @@ export interface components {
             code: string;
             message: string;
         };
+        LoginInput: {
+            /** Format: email */
+            email: string;
+            password: string;
+        };
         /** @enum {string} */
         Role: "director" | "teacher" | "guardian" | "student";
         StudentRef: {
@@ -379,6 +422,16 @@ export interface components {
             students: components["schemas"]["StudentRef"][];
             /** Format: uuid */
             pendingRescheduleRequestId?: string | null;
+            /**
+             * @description Quien consulta puede proponer o aplicar un cambio de horario ahora.
+             *     Las reglas viven en el servidor; el cliente solo las muestra.
+             */
+            canReschedule: boolean;
+            /**
+             * @description Si quien consulta tendría permiso pero una regla de la academia lo impide
+             *     (anticipación mínima, tope mensual), explica por qué. null en cualquier otro caso.
+             */
+            rescheduleBlockedReason?: string | null;
         };
         CancelInput: {
             reason: string;
@@ -431,6 +484,8 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             expiresAt: string;
+            /** @description Quien consulta puede aprobar o rechazar esta solicitud ahora. */
+            viewerCanDecide: boolean;
         };
         DecisionInput: {
             /** @enum {string} */
@@ -469,6 +524,15 @@ export interface components {
         };
     };
     responses: {
+        /** @description No hay sesión abierta o expiró */
+        Unauthorized: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["Problem"];
+            };
+        };
         /** @description Solicitud inválida */
         BadRequest: {
             headers: {
@@ -573,6 +637,58 @@ export interface operations {
             };
         };
     };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginInput"];
+            };
+        };
+        responses: {
+            /** @description Sesión abierta */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Viewer"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description Correo o contraseña incorrectos (no se indica cuál de los dos) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Sesión cerrada (también si ya estaba cerrada) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     getMe: {
         parameters: {
             query?: never;
@@ -591,6 +707,7 @@ export interface operations {
                     "application/json": components["schemas"]["Viewer"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
         };
     };
     listRooms: {

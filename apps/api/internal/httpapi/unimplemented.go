@@ -71,3 +71,11 @@ func (s *Server) ListNotifications(context.Context, api.ListNotificationsRequest
 func (s *Server) MarkNotificationRead(context.Context, api.MarkNotificationReadRequestObject) (api.MarkNotificationReadResponseObject, error) {
 	return nil, ErrNotImplemented
 }
+
+func (s *Server) Login(context.Context, api.LoginRequestObject) (api.LoginResponseObject, error) {
+	return nil, ErrNotImplemented
+}
+
+func (s *Server) Logout(context.Context, api.LogoutRequestObject) (api.LogoutResponseObject, error) {
+	return nil, ErrNotImplemented
+}
