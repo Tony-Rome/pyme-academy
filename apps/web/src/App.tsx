@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { AppShell } from "@/components/AppShell";
 import { LoginPage } from "@/features/auth/LoginPage";
+import { AttendancePage } from "@/features/attendance/AttendancePage";
 import { RequireAuth } from "@/features/auth/RequireAuth";
 import { RequireRole } from "@/features/auth/RequireRole";
 import { MyClassesPage } from "@/features/students/MyClassesPage";
@@ -24,6 +25,7 @@ export function App() {
             <Route path="solicitudes" element={<RequestsPage />} />
 
             <Route element={<RequireRole roles={["teacher", "director"]} />}>
+              <Route path="asistencia" element={<AttendancePage />} />
               <Route path="alumnos" element={<StudentsPage />} />
               <Route path="alumnos/:studentId" element={<StudentDetailPage />} />
             </Route>

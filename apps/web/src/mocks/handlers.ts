@@ -163,6 +163,23 @@ export const handlers = [
     }),
   ),
   http.get(
+    `${BASE}/attendance/alerts`,
+    authed(() => respond(store.attendanceAlerts())),
+  ),
+  http.get(
+    `${BASE}/attendance/report`,
+    authed(({ request }) => {
+      const url = new URL(request.url);
+      const range = periodFrom(url);
+      if (!range) return badPeriod();
+      const groupBy = url.searchParams.get("groupBy") ?? "student";
+      if (groupBy !== "student" && groupBy !== "group" && groupBy !== "teacher") {
+        return problem(400, "bad_request", "groupBy debe ser student, group o teacher");
+      }
+      return respond(store.attendanceReport(range.from, range.to, groupBy));
+    }),
+  ),
+  http.get(
     `${BASE}/reschedule-requests`,
     authed(({ request }) => {
       const status = new URL(request.url).searchParams.get("status");

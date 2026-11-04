@@ -470,6 +470,57 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Problem" }
 
+  /attendance/alerts:
+    get:
+      operationId: listAttendanceAlerts
+      summary: Alumnos con 3 o más ausencias seguidas (dirección y profesores)
+      description: |
+        Por alumno y grupo, se cuentan hacia atrás las clases ya marcadas: la racha son las
+        ausencias consecutivas más recientes. Una clase presente, atrasada o justificada corta
+        la racha; las sin marcar y las canceladas se ignoran.
+        Dirección ve todas; un profesor, las de sus grupos. Las familias reciben 403.
+      tags: [attendance]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceAlert"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /attendance/report:
+    get:
+      operationId: getAttendanceReport
+      summary: Reporte de asistencia por alumno, grupo o profesor (dirección y profesores)
+      description: |
+        Un profesor ve solo sus grupos y alumnos (agrupado por profesor, solo su propia fila).
+        Dirección ve todo. Las familias reciben 403. El CSV se arma a partir de estas filas.
+      tags: [attendance]
+      parameters:
+        - $ref: "#/components/parameters/OptionalFrom"
+        - $ref: "#/components/parameters/OptionalTo"
+        - name: groupBy
+          in: query
+          required: false
+          schema:
+            $ref: "#/components/schemas/AttendanceGroupBy"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AttendanceReportRow"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /notifications:
     get:
       operationId: listNotifications
@@ -937,7 +988,10 @@ components:
             - $ref: "#/components/schemas/AttendanceStatus"
           nullable: true
           description: null mientras no se haya marcado
-        note: { type: string, nullable: true }
+        note:
+          type: string
+          nullable: true
+          description: Nota del profesor sobre el alumno. Solo la ven profesores y dirección; a las familias se les devuelve null.
         agreedInAdvance:
           type: boolean
           description: |
@@ -961,6 +1015,46 @@ components:
                 type: boolean
                 default: false
                 description: Solo es válido con el estado `excused`; con otro estado el servidor responde 400.
+
+    AttendanceAlert:
+      type: object
+      required: [student, groupName, teacher, consecutiveAbsences, lastAbsenceAt]
+      properties:
+        student: { $ref: "#/components/schemas/StudentRef" }
+        groupId: { type: string, format: uuid }
+        groupName: { type: string }
+        teacher: { $ref: "#/components/schemas/TeacherRef" }
+        consecutiveAbsences:
+          type: integer
+          minimum: 3
+        lastAbsenceAt: { type: string, format: date-time }
+        lastAttendedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Última clase del grupo a la que asistió (presente o atrasado), si hay alguna marcada
+
+    AttendanceGroupBy:
+      type: string
+      enum: [student, group, teacher]
+      default: student
+
+    AttendanceReportRow:
+      type: object
+      required: [id, name, summary]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        summary: { $ref: "#/components/schemas/AttendanceSummary" }
+        attendanceRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          nullable: true
+          description: |
+            (presentes + atrasos) ÷ (presentes + atrasos + ausentes + justificadas).
+            Las sin marcar no cuentan. null si no hay clases marcadas.
 
     Notification:
       type: object

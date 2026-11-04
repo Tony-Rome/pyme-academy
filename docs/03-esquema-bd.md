@@ -178,6 +178,34 @@ GROUP BY g.teacher_id;
 ```
 Solo cuentan clases ya iniciadas y no canceladas; si el alumno no tiene fila de asistencia, esa clase está "sin marcar".
 
+**Alumnos con 3 o más ausencias seguidas** (alertas de asistencia, historia F4):
+```sql
+WITH marked AS (
+  SELECT e.student_id, g.id AS group_id, s.starts_at, a.status,
+         row_number() OVER (PARTITION BY e.student_id, g.id ORDER BY s.starts_at DESC) AS rn
+  FROM enrollments e
+  JOIN class_groups g ON g.id = e.class_group_id
+  JOIN sessions s     ON s.class_group_id = g.id
+                     AND s.status <> 'cancelled' AND s.starts_at <= now()
+  JOIN attendance a   ON a.session_id = s.id AND a.student_id = e.student_id  -- solo clases marcadas
+  WHERE e.status = 'active'
+),
+first_break AS (                      -- la clase más reciente que NO fue ausencia
+  SELECT student_id, group_id, min(rn) AS rn
+  FROM marked WHERE status <> 'absent'
+  GROUP BY student_id, group_id
+)
+SELECT m.student_id, m.group_id,
+       count(*)        AS ausencias_seguidas,
+       max(m.starts_at) AS ultima_ausencia
+FROM marked m
+LEFT JOIN first_break b USING (student_id, group_id)
+WHERE m.status = 'absent' AND (b.rn IS NULL OR m.rn < b.rn)
+GROUP BY m.student_id, m.group_id
+HAVING count(*) >= 3;
+```
+Las clases sin marcar no aparecen en `attendance`, así que el `JOIN` las ignora: no cortan ni suman. Esta consulta está cubierta por una prueba automática (`TestConsecutiveAbsencesQuery`).
+
 **Asistencia por alumno en un período:**
 ```sql
 SELECT st.full_name,

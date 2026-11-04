@@ -186,7 +186,7 @@ export function buildSeed(now = new Date()): SeedData {
   let n = 0;
 
   for (const g of groups) {
-    for (let week = -2; week <= 12; week++) {
+    for (let week = -4; week <= 12; week++) {
       const dayOffset = week * 7 + ((g.weekday + 6) % 7);
       const start = at(monday, dayOffset, g.startTime);
       const end = new Date(start.getTime() + g.durationMinutes * 60_000);
@@ -283,6 +283,23 @@ export function buildSeed(now = new Date()): SeedData {
       });
     });
   });
+
+  // Rachas de ausencias para que la demo muestre las alertas (alumno, grupo, clases recientes).
+  const byId = new Map(sessions.map((x) => [x.id, x]));
+  const forceAbsent = (studentId: string, groupId: string, count: number) => {
+    attendance
+      .filter((a) => a.studentId === studentId && byId.get(a.sessionId)?.classGroupId === groupId)
+      .sort((a, b) => byId.get(b.sessionId)!.startsAt.localeCompare(byId.get(a.sessionId)!.startsAt))
+      .slice(0, count)
+      .forEach((a, i) => {
+        a.status = "absent";
+        a.agreedInAdvance = false;
+        if (i === 0) a.note = "Sin aviso de la familia";
+      });
+  };
+  forceAbsent(ID.student(13), ID.group(6), 3); // Catalina Herrera, violín inicial
+  forceAbsent(ID.student(20), ID.group(8), 3); // Felipe Maldonado, coro infantil
+  forceAbsent(ID.student(3), ID.group(3), 3); // Isidora Vega, piano infantil
 
   return { attendance, sessions, requests: [request], notifications };
 }

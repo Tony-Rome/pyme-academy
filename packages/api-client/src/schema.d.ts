@@ -353,6 +353,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/attendance/alerts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alumnos con 3 o más ausencias seguidas (dirección y profesores)
+         * @description Por alumno y grupo, se cuentan hacia atrás las clases ya marcadas: la racha son las
+         *     ausencias consecutivas más recientes. Una clase presente, atrasada o justificada corta
+         *     la racha; las sin marcar y las canceladas se ignoran.
+         *     Dirección ve todas; un profesor, las de sus grupos. Las familias reciben 403.
+         */
+        get: operations["listAttendanceAlerts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attendance/report": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Reporte de asistencia por alumno, grupo o profesor (dirección y profesores)
+         * @description Un profesor ve solo sus grupos y alumnos (agrupado por profesor, solo su propia fila).
+         *     Dirección ve todo. Las familias reciben 403. El CSV se arma a partir de estas filas.
+         */
+        get: operations["getAttendanceReport"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/notifications": {
         parameters: {
             query?: never;
@@ -670,6 +714,7 @@ export interface components {
             fullName: string;
             /** @description null mientras no se haya marcado */
             status?: components["schemas"]["AttendanceStatus"] | null;
+            /** @description Nota del profesor sobre el alumno. Solo la ven profesores y dirección; a las familias se les devuelve null. */
             note?: string | null;
             /**
              * @description Ausencia acordada de antemano con el profesor. Solo puede ser true cuando el
@@ -689,6 +734,38 @@ export interface components {
                  */
                 agreedInAdvance: boolean;
             }[];
+        };
+        AttendanceAlert: {
+            student: components["schemas"]["StudentRef"];
+            /** Format: uuid */
+            groupId?: string;
+            groupName: string;
+            teacher: components["schemas"]["TeacherRef"];
+            consecutiveAbsences: number;
+            /** Format: date-time */
+            lastAbsenceAt: string;
+            /**
+             * Format: date-time
+             * @description Última clase del grupo a la que asistió (presente o atrasado), si hay alguna marcada
+             */
+            lastAttendedAt?: string | null;
+        };
+        /**
+         * @default student
+         * @enum {string}
+         */
+        AttendanceGroupBy: "student" | "group" | "teacher";
+        AttendanceReportRow: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            summary: components["schemas"]["AttendanceSummary"];
+            /**
+             * Format: double
+             * @description (presentes + atrasos) ÷ (presentes + atrasos + ausentes + justificadas).
+             *     Las sin marcar no cuentan. null si no hay clases marcadas.
+             */
+            attendanceRate?: number | null;
         };
         Notification: {
             /** Format: uuid */
@@ -1292,6 +1369,55 @@ export interface operations {
                     "application/json": components["schemas"]["Problem"];
                 };
             };
+        };
+    };
+    listAttendanceAlerts: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceAlert"][];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getAttendanceReport: {
+        parameters: {
+            query?: {
+                /** @description Inicio del período (incluido). Por defecto, el comienzo del mes actual. */
+                from?: components["parameters"]["OptionalFrom"];
+                /** @description Fin del período (excluido). Por defecto, el comienzo del mes siguiente. */
+                to?: components["parameters"]["OptionalTo"];
+                groupBy?: components["schemas"]["AttendanceGroupBy"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceReportRow"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
         };
     };
     listNotifications: {

@@ -35,6 +35,8 @@ export function useSaveAttendance(sessionId: string) {
     onSettled: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: ["attendance"] }),
+        queryClient.invalidateQueries({ queryKey: ["attendance-alerts"] }),
+        queryClient.invalidateQueries({ queryKey: ["attendance-report"] }),
         queryClient.invalidateQueries({ queryKey: ["sessions"] }),
         queryClient.invalidateQueries({ queryKey: ["students"] }),
         queryClient.invalidateQueries({ queryKey: ["teachers"] }),

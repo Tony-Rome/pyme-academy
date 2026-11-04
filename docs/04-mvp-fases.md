@@ -27,6 +27,7 @@ Cada función se puntuó con cuatro criterios: **impacto** (ahorra horas o mueve
 | Consentimientos y retiro de menores | Medio-alto (riesgo) | Una vez | Bajo | 1 |
 | Reemplazo de profesor | Medio-alto | Ocasional | Bajo | 1 |
 | Alumnos y profesores vinculados | Medio-alto | Semanal | Bajo | 1 |
+| Alertas de ausencias y reporte de asistencia | Medio-alto | Semanal | Bajo | 1 |
 | Materiales simples (PDF y enlaces) | Medio | Semanal | Bajo | 1 |
 | Control de mensualidades | Alto | Mensual | Bajo | 2 |
 | Descuentos y becas | Medio | Mensual | Bajo | 2 |
@@ -107,6 +108,7 @@ Cada función se puntuó con cuatro criterios: **impacto** (ahorra horas o mueve
 15. **Consentimientos de imagen** y **autorizados para retirar al menor**, registrados con fecha.
 16. **Suscripción al calendario** (iCal) para ver las clases en el teléfono.
 17. **Alumnos y profesores vinculados:** el profesor ve sus alumnos y, por cada uno, sus clases y horas del mes; la familia ve, por cada alumno, sus profesores con las clases y horas de cada uno. Dirección ve todo (épica N): además de los alumnos, tiene una vista de todos los profesores (grupos, alumnos, horas dictadas y reemplazos) y navega de uno a otro.
+18. **Alertas de ausencias seguidas y reporte de asistencia** (historias F3 y F4): aviso a dirección y profesores cuando un alumno acumula 3 ausencias seguidas, y reporte mensual por alumno, grupo o profesor con descarga CSV. Es una versión simple y explicable; la alerta de riesgo de deserción de la fase 3 la combinará con los pagos.
 
 ### Cambios al modelo de datos
 Agregar al esquema actual: `closures`, `consents` (tipo, otorgado por, fecha, revocado) y `pickup_authorizations` (alumno, persona autorizada, documento).

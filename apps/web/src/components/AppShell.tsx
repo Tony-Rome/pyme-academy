@@ -1,8 +1,9 @@
-import { CalendarDays, GraduationCap, Inbox, LogOut, Music, Users } from "lucide-react";
+import { CalendarDays, ClipboardCheck, GraduationCap, Inbox, LogOut, Music, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 import { ApiStatus } from "@/components/ApiStatus";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAttendanceAlerts } from "@/features/attendance/reportHooks";
 import { useLogout } from "@/features/auth/hooks";
 import { useRequests } from "@/features/reschedule/hooks";
 import { useViewer } from "@/features/viewer/useViewer";
@@ -14,6 +15,7 @@ type NavItem = { to: string; label: string; icon: typeof CalendarDays };
 
 const CALENDAR: NavItem = { to: "/calendario", label: "Calendario", icon: CalendarDays };
 const REQUESTS: NavItem = { to: "/solicitudes", label: "Solicitudes", icon: Inbox };
+const ATTENDANCE: NavItem = { to: "/asistencia", label: "Asistencia", icon: ClipboardCheck };
 
 /** Qué ve cada rol en el menú. */
 function navFor(role: Role | undefined): NavItem[] {
@@ -23,10 +25,11 @@ function navFor(role: Role | undefined): NavItem[] {
         CALENDAR,
         { to: "/alumnos", label: "Alumnos", icon: Users },
         { to: "/profesores", label: "Profesores", icon: GraduationCap },
+        ATTENDANCE,
         REQUESTS,
       ];
     case "teacher":
-      return [CALENDAR, { to: "/alumnos", label: "Mis alumnos", icon: Users }, REQUESTS];
+      return [CALENDAR, { to: "/alumnos", label: "Mis alumnos", icon: Users }, ATTENDANCE, REQUESTS];
     default:
       return [CALENDAR, { to: "/mis-clases", label: "Mis clases", icon: Users }, REQUESTS];
   }
@@ -39,6 +42,10 @@ export function AppShell() {
   // Solo se cuentan las solicitudes que esta persona puede resolver.
   const pending = useRequests("pending");
   const actionable = pending.data?.filter((r) => r.viewerCanDecide).length ?? 0;
+
+  // Alumnos con ausencias seguidas: solo dirección y profesores tienen esta información.
+  const staff = viewer?.activeRole === "director" || viewer?.activeRole === "teacher";
+  const alertCount = useAttendanceAlerts(!!staff).data?.length ?? 0;
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -65,6 +72,11 @@ export function AppShell() {
                 {label}
                 {to === "/solicitudes" && actionable > 0 && (
                   <Badge aria-label={`${actionable} por resolver`}>{actionable}</Badge>
+                )}
+                {to === "/asistencia" && alertCount > 0 && (
+                  <Badge variant="destructive" aria-label={`${alertCount} alertas de ausencias`}>
+                    {alertCount}
+                  </Badge>
                 )}
               </NavLink>
             ))}

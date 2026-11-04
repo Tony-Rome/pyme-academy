@@ -284,6 +284,129 @@ func TestAttendanceAgreedInAdvanceOnlyWhenExcused(t *testing.T) {
 	}
 }
 
+// La consulta de ausencias seguidas es la que documenta docs/03-esquema-bd.md y usará el backend.
+const consecutiveAbsencesSQL = `
+WITH marked AS (
+  SELECT e.student_id, g.id AS group_id, s.starts_at, a.status,
+         row_number() OVER (PARTITION BY e.student_id, g.id ORDER BY s.starts_at DESC) AS rn
+  FROM enrollments e
+  JOIN class_groups g ON g.id = e.class_group_id
+  JOIN sessions s     ON s.class_group_id = g.id
+                     AND s.status <> 'cancelled' AND s.starts_at <= now()
+  JOIN attendance a   ON a.session_id = s.id AND a.student_id = e.student_id
+  WHERE e.status = 'active'
+),
+first_break AS (
+  SELECT student_id, group_id, min(rn) AS rn
+  FROM marked WHERE status <> 'absent'
+  GROUP BY student_id, group_id
+)
+SELECT m.student_id, m.group_id, count(*) AS ausencias_seguidas
+FROM marked m
+LEFT JOIN first_break b USING (student_id, group_id)
+WHERE m.status = 'absent' AND (b.rn IS NULL OR m.rn < b.rn)
+GROUP BY m.student_id, m.group_id
+HAVING count(*) >= 3`
+
+func TestConsecutiveAbsencesQuery(t *testing.T) {
+	pool := testdb.New(t)
+	f := setup(t, pool)
+	ctx := context.Background()
+
+	newStudent := func(name string) string {
+		var id string
+		if err := pool.QueryRow(ctx,
+			`INSERT INTO students(academy_id,full_name,birth_date) VALUES ($1,$2,'2012-01-01') RETURNING id`,
+			f.academy, name).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	a, b, c := f.student, newStudent("B"), newStudent("C")
+	for _, id := range []string{a, b, c} {
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO enrollments(class_group_id,student_id) VALUES ($1,$2)`, f.group, id); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Cinco clases ya realizadas, de hace 7 a 3 días (de la más antigua a la más reciente).
+	days := []int{7, 6, 5, 4, 3}
+	session := map[int]string{}
+	for _, d := range days {
+		var id string
+		if err := pool.QueryRow(ctx,
+			`INSERT INTO sessions(academy_id,class_group_id,teacher_id,starts_at,ends_at,status)
+			 VALUES ($1,$2,$3, now() - make_interval(days => $4::int),
+			         now() - make_interval(days => $4::int) + interval '45 minutes', 'completed')
+			 RETURNING id`,
+			f.academy, f.group, f.teacher1, d).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		session[d] = id
+	}
+	// Una clase cancelada más reciente no debe contar ni cortar la racha.
+	if _, err := pool.Exec(ctx,
+		`INSERT INTO sessions(academy_id,class_group_id,teacher_id,starts_at,ends_at,status)
+		 VALUES ($1,$2,$3, now() - interval '2 days', now() - interval '2 days' + interval '45 minutes', 'cancelled')`,
+		f.academy, f.group, f.teacher1); err != nil {
+		t.Fatal(err)
+	}
+
+	mark := func(day int, student, status string) {
+		t.Helper()
+		if _, err := pool.Exec(ctx,
+			`INSERT INTO attendance(session_id,student_id,status) VALUES ($1,$2,$3)`,
+			session[day], student, status); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// A: presente y luego 3 ausencias; la clase más reciente quedó sin marcar (se ignora).
+	mark(7, a, "present")
+	mark(6, a, "absent")
+	mark(5, a, "absent")
+	mark(4, a, "absent")
+	// B: una justificada corta la racha; solo quedan 2 ausencias seguidas.
+	mark(7, b, "absent")
+	mark(6, b, "absent")
+	mark(5, b, "excused")
+	mark(4, b, "absent")
+	mark(3, b, "absent")
+	// C: ausente en todas las clases.
+	for _, d := range days {
+		mark(d, c, "absent")
+	}
+
+	rows, err := pool.Query(ctx, consecutiveAbsencesSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer rows.Close()
+
+	got := map[string]int{}
+	for rows.Next() {
+		var student, group string
+		var streak int
+		if err := rows.Scan(&student, &group, &streak); err != nil {
+			t.Fatal(err)
+		}
+		got[student] = streak
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatal(err)
+	}
+
+	if got[a] != 3 {
+		t.Errorf("A: racha %d, se esperaba 3 (la clase sin marcar se ignora)", got[a])
+	}
+	if _, ok := got[b]; ok {
+		t.Errorf("B no debe aparecer: una ausencia justificada corta la racha (racha %d)", got[b])
+	}
+	if got[c] != 5 {
+		t.Errorf("C: racha %d, se esperaba 5 (la clase cancelada no cuenta)", got[c])
+	}
+}
+
 func TestMigrationsApplyCleanly(t *testing.T) {
 	pool := testdb.New(t)
 

@@ -33,16 +33,22 @@ export function AttendanceSection({ session, onTake }: Props) {
       {attendance.isSuccess && records.length > 0 && (
         <ul className="space-y-1.5 text-sm">
           {records.map((r) => (
-            <li key={r.studentId} className="flex flex-wrap items-center justify-between gap-2">
-              <span>{r.fullName}</span>
-              <span className="flex items-center gap-1.5">
-                {r.agreedInAdvance && <Badge variant="outline">Acordada</Badge>}
-                {r.status ? (
-                  <Badge variant={r.status === "absent" ? "destructive" : "secondary"}>{STATUS_LABELS[r.status]}</Badge>
-                ) : (
-                  <Badge variant="outline">Sin marcar</Badge>
-                )}
-              </span>
+            <li key={r.studentId}>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span>{r.fullName}</span>
+                <span className="flex items-center gap-1.5">
+                  {r.agreedInAdvance && <Badge variant="outline">Acordada</Badge>}
+                  {r.status ? (
+                    <Badge variant={r.status === "absent" ? "destructive" : "secondary"}>
+                      {STATUS_LABELS[r.status]}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline">Sin marcar</Badge>
+                  )}
+                </span>
+              </div>
+              {/* El servidor solo entrega la nota a profesores y dirección. */}
+              {r.note && <p className="text-xs text-muted-foreground">Nota: {r.note}</p>}
             </li>
           ))}
         </ul>

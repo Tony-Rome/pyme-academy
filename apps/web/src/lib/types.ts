@@ -23,3 +23,6 @@ export type PeriodHours = Schemas["PeriodHours"];
 export type AttendanceStatus = Schemas["AttendanceStatus"];
 export type AttendanceRecord = Schemas["AttendanceRecord"];
 export type AttendanceSummary = Schemas["AttendanceSummary"];
+export type AttendanceAlert = Schemas["AttendanceAlert"];
+export type AttendanceReportRow = Schemas["AttendanceReportRow"];
+export type AttendanceGroupBy = Schemas["AttendanceGroupBy"];

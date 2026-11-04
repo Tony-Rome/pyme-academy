@@ -91,3 +91,11 @@ func (s *Server) GetStudent(context.Context, api.GetStudentRequestObject) (api.G
 func (s *Server) GetTeacher(context.Context, api.GetTeacherRequestObject) (api.GetTeacherResponseObject, error) {
 	return nil, ErrNotImplemented
 }
+
+func (s *Server) ListAttendanceAlerts(context.Context, api.ListAttendanceAlertsRequestObject) (api.ListAttendanceAlertsResponseObject, error) {
+	return nil, ErrNotImplemented
+}
+
+func (s *Server) GetAttendanceReport(context.Context, api.GetAttendanceReportRequestObject) (api.GetAttendanceReportResponseObject, error) {
+	return nil, ErrNotImplemented
+}

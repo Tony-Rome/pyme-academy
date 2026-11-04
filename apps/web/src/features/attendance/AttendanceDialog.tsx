@@ -9,6 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatTimeRange } from "@/lib/format";
 import { ApiError } from "@/lib/problem";
@@ -33,9 +34,10 @@ export function AttendanceDialog({ session, onClose }: Props) {
   );
 }
 
-interface Edit {
-  status: AttendanceStatus;
+interface Row {
+  status: AttendanceStatus | null;
   agreedInAdvance: boolean;
+  note: string;
 }
 
 function AttendanceForm({ session, onClose }: { session: Session; onClose: () => void }) {
@@ -43,49 +45,47 @@ function AttendanceForm({ session, onClose }: { session: Session; onClose: () =>
   const attendance = useAttendance(session.id);
   const save = useSaveAttendance(session.id);
 
-  // Solo se guardan los cambios hechos aquí; lo ya marcado en el servidor no se reenvía.
-  const [edits, setEdits] = useState<Record<string, Edit>>({});
+  // Solo se guardan los alumnos que se tocaron aquí; lo ya marcado en el servidor no se reenvía.
+  const [edits, setEdits] = useState<Record<string, Row>>({});
 
-  const rows = (attendance.data ?? []).map((record) => {
-    const edit = edits[record.studentId];
-    return {
-      id: record.studentId,
-      name: record.fullName,
-      status: edit?.status ?? record.status ?? null,
-      agreed: edit?.agreedInAdvance ?? record.agreedInAdvance,
-    };
-  });
+  const rows = (attendance.data ?? []).map((record) => ({
+    id: record.studentId,
+    name: record.fullName,
+    ...(edits[record.studentId] ?? {
+      status: record.status ?? null,
+      agreedInAdvance: record.agreedInAdvance,
+      note: record.note ?? "",
+    }),
+  }));
 
   const unmarked = rows.filter((r) => r.status === null);
   const changes = Object.keys(edits).length;
 
-  function setStatus(id: string, status: AttendanceStatus) {
-    setEdits((prev) => ({
-      ...prev,
-      // "Acordada" solo existe con "Justificado": al cambiar de estado se descarta.
-      [id]: { status, agreedInAdvance: status === "excused" ? (prev[id]?.agreedInAdvance ?? false) : false },
-    }));
-  }
+  const current = (id: string): Row => {
+    const row = rows.find((r) => r.id === id)!;
+    return { status: row.status, agreedInAdvance: row.agreedInAdvance, note: row.note };
+  };
+  const update = (id: string, change: Partial<Row>) => setEdits((prev) => ({ ...prev, [id]: { ...current(id), ...change } }));
 
-  function setAgreed(id: string, agreedInAdvance: boolean) {
-    setEdits((prev) => ({ ...prev, [id]: { status: "excused", agreedInAdvance } }));
-  }
+  // "Acordada" solo existe con "Justificado": al cambiar de estado se descarta.
+  const setStatus = (id: string, status: AttendanceStatus) =>
+    update(id, { status, agreedInAdvance: status === "excused" ? current(id).agreedInAdvance : false });
 
   function markAllPresent() {
     setEdits((prev) => {
       const next = { ...prev };
-      for (const row of unmarked) next[row.id] = { status: "present", agreedInAdvance: false };
+      for (const row of unmarked) next[row.id] = { status: "present", agreedInAdvance: false, note: row.note };
       return next;
     });
   }
 
   function submit() {
     save.mutate(
-      Object.entries(edits).map(([studentId, edit]) => ({
-        studentId,
-        status: edit.status,
-        agreedInAdvance: edit.agreedInAdvance,
-      })),
+      Object.entries(edits).flatMap(([studentId, edit]) =>
+        edit.status
+          ? [{ studentId, status: edit.status, agreedInAdvance: edit.agreedInAdvance, note: edit.note.trim() || null }]
+          : [],
+      ),
       {
         onSuccess: () => {
           notice("Asistencia guardada.");
@@ -166,11 +166,23 @@ function AttendanceForm({ session, onClose }: { session: Session; onClose: () =>
                     <input
                       type="checkbox"
                       className="size-4 accent-primary"
-                      checked={row.agreed}
-                      onChange={(e) => setAgreed(row.id, e.target.checked)}
+                      checked={row.agreedInAdvance}
+                      onChange={(e) => update(row.id, { agreedInAdvance: e.target.checked })}
                     />
                     Acordada de antemano con el profesor
                   </label>
+                )}
+
+                {/* La nota necesita un estado: el servidor guarda estado y nota juntos. */}
+                {row.status && (
+                  <Input
+                    className="mt-2"
+                    aria-label={`Nota sobre ${row.name} (opcional)`}
+                    placeholder="Nota (opcional)"
+                    maxLength={200}
+                    value={row.note}
+                    onChange={(e) => update(row.id, { note: e.target.value })}
+                  />
                 )}
               </li>
             ))}

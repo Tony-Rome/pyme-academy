@@ -119,9 +119,25 @@ Formato: *Como [rol], quiero [acción], para [beneficio].*
 - Dentro de cada clase que ya empezó, la familia ve el estado de cada uno de sus hijos.
 - En "Mis clases" ve el resumen del mes: clases a las que asistió, ausencias, justificadas, sin marcar y horas asistidas.
 
-**F3 (S).** Como director, quiero un reporte de asistencia por alumno, grupo y profesor, con exportación a CSV.
+**F1c (S).** Como profesor, quiero dejar una nota breve sobre un alumno al marcar su asistencia (por ejemplo, "llegó sin el instrumento"), para recordar el contexto.
+- La nota es opcional y solo se puede escribir si el alumno ya tiene un estado.
+- La ven profesores y dirección. **Las familias no la ven**: el servidor la omite en sus respuestas.
 
-**F4 (C).** Como director, quiero alertas cuando un alumno acumule 3 ausencias seguidas, para contactar a la familia a tiempo.
+**F3 (S).** Como director o profesor, quiero un reporte de asistencia por alumno, grupo y profesor, con exportación a CSV.
+- Se elige el período (mes) y la agrupación: por alumno, por grupo o por profesor.
+- Cada fila muestra presentes, atrasos, ausentes, justificadas, sin marcar, horas asistidas y porcentaje de asistencia.
+- **Porcentaje de asistencia:** (presentes + atrasos) ÷ (presentes + atrasos + ausentes + justificadas). Las clases sin marcar no cuentan; se informan aparte. Sin clases marcadas, no hay porcentaje.
+- Un profesor ve solo sus grupos y alumnos; por profesor, solo su propia fila. Dirección ve todo. Las familias no acceden.
+- **CSV:** una fila por cada fila del reporte, con separador `;` y codificación UTF-8 con BOM, para que Excel en español lo abra bien con las tildes.
+
+**F4 (S).** Como director o profesor, quiero alertas cuando un alumno acumule 3 ausencias seguidas, para contactar a la familia a tiempo.
+- **Regla (umbral de 3, configurable por academia más adelante):** por alumno y grupo, se cuentan hacia atrás las clases ya marcadas; la racha son las **ausentes** consecutivas más recientes.
+- Una clase **justificada, presente o atrasada** corta la racha: si la familia avisó o el alumno vino, no hay alerta.
+- Las clases **sin marcar se ignoran** (no cortan ni suman): una clase pendiente no debe esconder una alerta.
+- Las clases canceladas no cuentan.
+- La alerta indica alumno, grupo, profesor, cuántas ausencias seguidas lleva, la fecha de la última ausencia y cuándo asistió por última vez.
+- Dirección ve todas las alertas; un profesor, las de sus grupos. En el menú, el contador muestra cuántas hay.
+- Las familias no ven alertas.
 
 ---
 

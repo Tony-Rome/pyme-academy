@@ -2,7 +2,10 @@
 // Imita lo que hará el backend real; cuando este exista, este archivo se descarta.
 import { formatDate, formatTime } from "@/lib/format";
 import type {
+  AttendanceAlert,
+  AttendanceGroupBy,
   AttendanceRecord,
+  AttendanceReportRow,
   AttendanceStatus,
   AttendanceSummary,
   ClassGroup,
@@ -818,11 +821,9 @@ const ATTENDANCE_STATUSES: AttendanceStatus[] = ["present", "late", "absent", "e
 
 function attendanceRecords(s: MockSession, u: MockUser): AttendanceRecord[] {
   const g = groupOf(s);
+  const isFamily = u.role === "guardian" || u.role === "student";
   // Una familia ve solo a sus hijos; el resto, a todos los de la clase.
-  const visible =
-    u.role === "guardian" || u.role === "student"
-      ? g.studentIds.filter((id) => u.studentIds.includes(id))
-      : g.studentIds;
+  const visible = isFamily ? g.studentIds.filter((id) => u.studentIds.includes(id)) : g.studentIds;
   return visible
     .map((id) => {
       const record = attendanceOf(s.id).get(id);
@@ -830,7 +831,8 @@ function attendanceRecords(s: MockSession, u: MockUser): AttendanceRecord[] {
         studentId: id,
         fullName: studentById.get(id)!.fullName,
         status: record?.status ?? null,
-        note: record?.note ?? null,
+        // La nota del profesor no se muestra a las familias.
+        note: isFamily ? null : (record?.note ?? null),
         agreedInAdvance: record?.agreedInAdvance ?? false,
       };
     })
@@ -887,6 +889,127 @@ export function saveAttendance(sessionId: string, records: AttendanceInput[]): R
   if (s.status === "scheduled") s.status = "completed";
 
   return { ok: true, value: attendanceRecords(s, u) };
+}
+
+/** Ausencias seguidas a partir de las cuales se avisa (en el backend: `academy_settings`). */
+export const ALERT_THRESHOLD = 3;
+
+const staffOnly = () => fail(403, "forbidden", "Solo dirección y profesores ven las alertas y el reporte de asistencia.");
+
+/**
+ * Racha de ausencias por alumno y grupo. Cuenta hacia atrás las clases marcadas:
+ * presente, atrasado o justificado cortan la racha; las sin marcar y las canceladas se ignoran.
+ */
+export function attendanceAlerts(): Result<AttendanceAlert[]> {
+  const u = currentUser();
+  if (u.role !== "director" && u.role !== "teacher") return staffOnly();
+
+  const now = Date.now();
+  const alerts: AttendanceAlert[] = [];
+
+  for (const g of groups) {
+    if (u.role === "teacher" && g.teacherId !== u.id) continue;
+    const started = state.sessions
+      .filter((s) => s.classGroupId === g.id && s.status !== "cancelled" && new Date(s.startsAt).getTime() <= now)
+      .sort((a, b) => b.startsAt.localeCompare(a.startsAt));
+
+    for (const studentId of g.studentIds) {
+      let streak = 0;
+      let counting = true;
+      let lastAbsenceAt: string | null = null;
+      let lastAttendedAt: string | null = null;
+
+      for (const s of started) {
+        const record = attendanceOf(s.id).get(studentId);
+        if (!record) continue; // sin marcar: no corta ni suma
+        if (record.status === "absent") {
+          if (counting) {
+            streak++;
+            lastAbsenceAt ??= s.startsAt;
+          }
+        } else {
+          counting = false;
+          if (record.status === "present" || record.status === "late") lastAttendedAt ??= s.startsAt;
+        }
+        if (!counting && lastAttendedAt) break;
+      }
+
+      if (streak >= ALERT_THRESHOLD && lastAbsenceAt) {
+        alerts.push({
+          student: { id: studentId, fullName: studentById.get(studentId)!.fullName },
+          groupId: g.id,
+          groupName: g.name,
+          teacher: { id: g.teacherId, fullName: teacherById.get(g.teacherId)!.fullName },
+          consecutiveAbsences: streak,
+          lastAbsenceAt,
+          lastAttendedAt,
+        });
+      }
+    }
+  }
+
+  alerts.sort(
+    (a, b) => b.consecutiveAbsences - a.consecutiveAbsences || a.student.fullName.localeCompare(b.student.fullName, "es"),
+  );
+  return { ok: true, value: alerts };
+}
+
+type Summary = AttendanceReportRow["summary"];
+
+const emptySummary = (): Summary => ({ attendedMinutes: 0, present: 0, late: 0, absent: 0, excused: 0, unmarked: 0 });
+
+function addSummary(into: Summary, other: Summary) {
+  into.attendedMinutes += other.attendedMinutes;
+  into.present += other.present;
+  into.late += other.late;
+  into.absent += other.absent;
+  into.excused += other.excused;
+  into.unmarked += other.unmarked;
+}
+
+/** (presentes + atrasos) / (presentes + atrasos + ausentes + justificadas); las sin marcar no cuentan. */
+function attendanceRate(summary: Summary): number | null {
+  const attended = summary.present + summary.late;
+  const marked = attended + summary.absent + summary.excused;
+  return marked === 0 ? null : attended / marked;
+}
+
+export function attendanceReport(from: Date, to: Date, groupBy: AttendanceGroupBy): Result<AttendanceReportRow[]> {
+  const u = currentUser();
+  if (u.role !== "director" && u.role !== "teacher") return staffOnly();
+
+  const sessionsOf = (groupIds: Set<string>) => state.sessions.filter((s) => groupIds.has(s.classGroupId));
+  const visibleGroups = groups.filter((g) => u.role === "director" || g.teacherId === u.id);
+  const rows: AttendanceReportRow[] = [];
+  const push = (id: string, name: string, summary: Summary) =>
+    rows.push({ id, name, summary, attendanceRate: attendanceRate(summary) });
+
+  if (groupBy === "student") {
+    const ids = new Set(visibleGroups.flatMap((g) => g.studentIds));
+    for (const studentId of ids) {
+      const mine = new Set(visibleGroups.filter((g) => g.studentIds.includes(studentId)).map((g) => g.id));
+      push(studentId, studentById.get(studentId)!.fullName, attendanceSummary(sessionsOf(mine), studentId, from, to));
+    }
+  } else if (groupBy === "group") {
+    for (const g of visibleGroups) {
+      const total = emptySummary();
+      const sessions = sessionsOf(new Set([g.id]));
+      for (const studentId of g.studentIds) addSummary(total, attendanceSummary(sessions, studentId, from, to));
+      push(g.id, g.name, total);
+    }
+  } else {
+    // Por quien dictó la clase (con reemplazos), igual que las horas de la vista de profesores.
+    for (const t of teachers.filter((x) => u.role === "director" || x.id === u.id)) {
+      const total = emptySummary();
+      for (const s of state.sessions.filter((x) => x.teacherId === t.id)) {
+        for (const studentId of groupOf(s).studentIds) addSummary(total, attendanceSummary([s], studentId, from, to));
+      }
+      push(t.id, t.fullName, total);
+    }
+  }
+
+  rows.sort((a, b) => a.name.localeCompare(b.name, "es"));
+  return { ok: true, value: rows };
 }
 
 // ---------------------------------------------------------------------------

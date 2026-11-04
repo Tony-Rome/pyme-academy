@@ -17,6 +17,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AttendanceGroupBy.
+const (
+	AttendanceGroupByGroup   AttendanceGroupBy = "group"
+	AttendanceGroupByStudent AttendanceGroupBy = "student"
+	AttendanceGroupByTeacher AttendanceGroupBy = "teacher"
+)
+
+// Valid indicates whether the value is a known member of the AttendanceGroupBy enum.
+func (e AttendanceGroupBy) Valid() bool {
+	switch e {
+	case AttendanceGroupByGroup:
+		return true
+	case AttendanceGroupByStudent:
+		return true
+	case AttendanceGroupByTeacher:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AttendanceStatus.
 const (
 	Absent  AttendanceStatus = "absent"
@@ -61,16 +82,16 @@ func (e DecisionInputDecision) Valid() bool {
 
 // Defines values for GroupKind.
 const (
-	Group      GroupKind = "group"
-	Individual GroupKind = "individual"
+	GroupKindGroup      GroupKind = "group"
+	GroupKindIndividual GroupKind = "individual"
 )
 
 // Valid indicates whether the value is a known member of the GroupKind enum.
 func (e GroupKind) Valid() bool {
 	switch e {
-	case Group:
+	case GroupKindGroup:
 		return true
-	case Individual:
+	case GroupKindIndividual:
 		return true
 	default:
 		return false
@@ -124,22 +145,22 @@ func (e RescheduleStatus) Valid() bool {
 
 // Defines values for Role.
 const (
-	Director Role = "director"
-	Guardian Role = "guardian"
-	Student  Role = "student"
-	Teacher  Role = "teacher"
+	RoleDirector Role = "director"
+	RoleGuardian Role = "guardian"
+	RoleStudent  Role = "student"
+	RoleTeacher  Role = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the Role enum.
 func (e Role) Valid() bool {
 	switch e {
-	case Director:
+	case RoleDirector:
 		return true
-	case Guardian:
+	case RoleGuardian:
 		return true
-	case Student:
+	case RoleStudent:
 		return true
-	case Teacher:
+	case RoleTeacher:
 		return true
 	default:
 		return false
@@ -167,6 +188,22 @@ func (e SessionStatus) Valid() bool {
 	}
 }
 
+// AttendanceAlert defines model for AttendanceAlert.
+type AttendanceAlert struct {
+	ConsecutiveAbsences int                 `json:"consecutiveAbsences"`
+	GroupId             *openapi_types.UUID `json:"groupId,omitempty"`
+	GroupName           string              `json:"groupName"`
+	LastAbsenceAt       time.Time           `json:"lastAbsenceAt"`
+
+	// LastAttendedAt Última clase del grupo a la que asistió (presente o atrasado), si hay alguna marcada
+	LastAttendedAt *time.Time `json:"lastAttendedAt,omitempty"`
+	Student        StudentRef `json:"student"`
+	Teacher        TeacherRef `json:"teacher"`
+}
+
+// AttendanceGroupBy defines model for AttendanceGroupBy.
+type AttendanceGroupBy string
+
 // AttendanceInput defines model for AttendanceInput.
 type AttendanceInput struct {
 	Records []struct {
@@ -182,13 +219,28 @@ type AttendanceInput struct {
 type AttendanceRecord struct {
 	// AgreedInAdvance Ausencia acordada de antemano con el profesor. Solo puede ser true cuando el
 	// estado es `excused`. La fase 1 solo la registra; los créditos llegan en la fase 2.
-	AgreedInAdvance bool    `json:"agreedInAdvance"`
-	FullName        string  `json:"fullName"`
-	Note            *string `json:"note,omitempty"`
+	AgreedInAdvance bool   `json:"agreedInAdvance"`
+	FullName        string `json:"fullName"`
+
+	// Note Nota del profesor sobre el alumno. Solo la ven profesores y dirección; a las familias se les devuelve null.
+	Note *string `json:"note,omitempty"`
 
 	// Status null mientras no se haya marcado
 	Status    *AttendanceStatus  `json:"status,omitempty"`
 	StudentId openapi_types.UUID `json:"studentId"`
+}
+
+// AttendanceReportRow defines model for AttendanceReportRow.
+type AttendanceReportRow struct {
+	// AttendanceRate (presentes + atrasos) ÷ (presentes + atrasos + ausentes + justificadas).
+	// Las sin marcar no cuentan. null si no hay clases marcadas.
+	AttendanceRate *float64           `json:"attendanceRate,omitempty"`
+	Id             openapi_types.UUID `json:"id"`
+	Name           string             `json:"name"`
+
+	// Summary Asistencia de un alumno en el período, solo de clases que ya empezaron y no se cancelaron.
+	// Un alumno sin marcar cuenta en `unmarked`; no se asume presente ni ausente.
+	Summary AttendanceSummary `json:"summary"`
 }
 
 // AttendanceStatus defines model for AttendanceStatus.
@@ -524,6 +576,16 @@ type PolicyViolation = Problem
 // Unauthorized defines model for Unauthorized.
 type Unauthorized = Problem
 
+// GetAttendanceReportParams defines parameters for GetAttendanceReport.
+type GetAttendanceReportParams struct {
+	// From Inicio del período (incluido). Por defecto, el comienzo del mes actual.
+	From *OptionalFrom `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Fin del período (excluido). Por defecto, el comienzo del mes siguiente.
+	To      *OptionalTo        `form:"to,omitempty" json:"to,omitempty"`
+	GroupBy *AttendanceGroupBy `form:"groupBy,omitempty" json:"groupBy,omitempty"`
+}
+
 // ListRescheduleRequestsParams defines parameters for ListRescheduleRequests.
 type ListRescheduleRequestsParams struct {
 	Status *RescheduleStatus `form:"status,omitempty" json:"status,omitempty"`
@@ -594,6 +656,12 @@ type CreateRescheduleRequestJSONRequestBody = RescheduleRequestInput
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListAttendanceAlerts Alumnos con 3 o más ausencias seguidas (dirección y profesores)
+	// (GET /attendance/alerts)
+	ListAttendanceAlerts(w http.ResponseWriter, r *http.Request)
+	// GetAttendanceReport Reporte de asistencia por alumno, grupo o profesor (dirección y profesores)
+	// (GET /attendance/report)
+	GetAttendanceReport(w http.ResponseWriter, r *http.Request, params GetAttendanceReportParams)
 	// Login Iniciar sesión con correo y contraseña
 	// (POST /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
@@ -665,6 +733,18 @@ type ServerInterface interface {
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
 
 type Unimplemented struct{}
+
+// ListAttendanceAlerts Alumnos con 3 o más ausencias seguidas (dirección y profesores)
+// (GET /attendance/alerts)
+func (_ Unimplemented) ListAttendanceAlerts(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetAttendanceReport Reporte de asistencia por alumno, grupo o profesor (dirección y profesores)
+// (GET /attendance/report)
+func (_ Unimplemented) GetAttendanceReport(w http.ResponseWriter, r *http.Request, params GetAttendanceReportParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
 
 // Login Iniciar sesión con correo y contraseña
 // (POST /auth/login)
@@ -806,6 +886,79 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListAttendanceAlerts operation middleware
+func (siw *ServerInterfaceWrapper) ListAttendanceAlerts(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListAttendanceAlerts(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetAttendanceReport operation middleware
+func (siw *ServerInterfaceWrapper) GetAttendanceReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetAttendanceReportParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "groupBy" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "groupBy", r.URL.Query(), &params.GroupBy, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "groupBy"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "groupBy", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetAttendanceReport(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // Login operation middleware
 func (siw *ServerInterfaceWrapper) Login(w http.ResponseWriter, r *http.Request) {
@@ -1608,6 +1761,12 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Put(options.BaseURL+"/sessions/{sessionId}/attendance", wrapper.SaveAttendance)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/attendance/alerts", wrapper.ListAttendanceAlerts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/attendance/report", wrapper.GetAttendanceReport)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/notifications", wrapper.ListNotifications)
 	})
 	r.Group(func(r chi.Router) {
@@ -1628,6 +1787,91 @@ type NotFoundJSONResponse Problem
 type PolicyViolationJSONResponse Problem
 
 type UnauthorizedJSONResponse Problem
+
+type ListAttendanceAlertsRequestObject struct {
+}
+
+type ListAttendanceAlertsResponseObject interface {
+	VisitListAttendanceAlertsResponse(w http.ResponseWriter) error
+}
+
+type ListAttendanceAlerts200JSONResponse []AttendanceAlert
+
+func (response ListAttendanceAlerts200JSONResponse) VisitListAttendanceAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListAttendanceAlerts403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListAttendanceAlerts403JSONResponse) VisitListAttendanceAlertsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAttendanceReportRequestObject struct {
+	Params GetAttendanceReportParams
+}
+
+type GetAttendanceReportResponseObject interface {
+	VisitGetAttendanceReportResponse(w http.ResponseWriter) error
+}
+
+type GetAttendanceReport200JSONResponse []AttendanceReportRow
+
+func (response GetAttendanceReport200JSONResponse) VisitGetAttendanceReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAttendanceReport400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetAttendanceReport400JSONResponse) VisitGetAttendanceReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetAttendanceReport403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetAttendanceReport403JSONResponse) VisitGetAttendanceReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type LoginRequestObject struct {
 	Body *LoginJSONRequestBody
@@ -2536,6 +2780,12 @@ func (response GetTeacher404JSONResponse) VisitGetTeacherResponse(w http.Respons
 
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+	// ListAttendanceAlerts Alumnos con 3 o más ausencias seguidas (dirección y profesores)
+	// (GET /attendance/alerts)
+	ListAttendanceAlerts(ctx context.Context, request ListAttendanceAlertsRequestObject) (ListAttendanceAlertsResponseObject, error)
+	// GetAttendanceReport Reporte de asistencia por alumno, grupo o profesor (dirección y profesores)
+	// (GET /attendance/report)
+	GetAttendanceReport(ctx context.Context, request GetAttendanceReportRequestObject) (GetAttendanceReportResponseObject, error)
 	// Login Iniciar sesión con correo y contraseña
 	// (POST /auth/login)
 	Login(ctx context.Context, request LoginRequestObject) (LoginResponseObject, error)
@@ -2641,6 +2891,56 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// ListAttendanceAlerts operation middleware
+func (sh *strictHandler) ListAttendanceAlerts(w http.ResponseWriter, r *http.Request) {
+	var request ListAttendanceAlertsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ListAttendanceAlerts(ctx, request.(ListAttendanceAlertsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ListAttendanceAlerts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ListAttendanceAlertsResponseObject); ok {
+		if err := validResponse.VisitListAttendanceAlertsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetAttendanceReport operation middleware
+func (sh *strictHandler) GetAttendanceReport(w http.ResponseWriter, r *http.Request, params GetAttendanceReportParams) {
+	var request GetAttendanceReportRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetAttendanceReport(ctx, request.(GetAttendanceReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetAttendanceReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetAttendanceReportResponseObject); ok {
+		if err := validResponse.VisitGetAttendanceReportResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // Login operation middleware
