@@ -2,6 +2,9 @@
 // Imita lo que hará el backend real; cuando este exista, este archivo se descarta.
 import { formatDate, formatTime } from "@/lib/format";
 import type {
+  AttendanceRecord,
+  AttendanceStatus,
+  AttendanceSummary,
   ClassGroup,
   Notification,
   RescheduleOption,
@@ -22,6 +25,7 @@ import {
   students,
   teachers,
   users,
+  type MockAttendance,
   type MockGroup,
   type MockNotification,
   type MockRequest,
@@ -39,6 +43,17 @@ export const POLICY = {
 const SESSION_KEY = "mock-session-user-id";
 
 const data = buildSeed();
+/** Asistencia por clase y alumno. */
+const attendanceBySession = new Map<string, Map<string, MockAttendance>>();
+for (const record of data.attendance) {
+  const inSession = attendanceBySession.get(record.sessionId) ?? new Map<string, MockAttendance>();
+  inSession.set(record.studentId, record);
+  attendanceBySession.set(record.sessionId, inSession);
+}
+const attendanceOf = (sessionId: string) => attendanceBySession.get(sessionId) ?? new Map<string, MockAttendance>();
+
+const ATTENDANCE_EDIT_DAYS = 7;
+
 const state = {
   sessions: data.sessions,
   requests: data.requests,
@@ -225,6 +240,22 @@ const CONFLICT_MESSAGES: Record<Conflict, string> = {
   student: "El alumno ya tiene otra clase en ese horario.",
 };
 
+/** Quién marca asistencia: quien dicta la clase y dirección. Las familias solo ven. */
+function mayMarkAttendance(s: MockSession, u: MockUser): boolean {
+  return u.role === "director" || (u.role === "teacher" && s.teacherId === u.id);
+}
+
+/** Por qué la asistencia no se puede marcar ahora, si no se puede. */
+function attendanceBlock(s: MockSession): string | null {
+  if (s.status === "cancelled") return "La clase está cancelada.";
+  const now = Date.now();
+  if (new Date(s.startsAt).getTime() > now) return "La clase aún no empieza.";
+  if (now > new Date(s.endsAt).getTime() + ATTENDANCE_EDIT_DAYS * 86_400_000) {
+    return `Pasaron más de ${ATTENDANCE_EDIT_DAYS} días desde la clase.`;
+  }
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Lecturas
 // ---------------------------------------------------------------------------
@@ -251,6 +282,7 @@ function toSession(s: MockSession, u: MockUser): Session {
       ? g.studentIds.filter((id) => u.studentIds.includes(id))
       : g.studentIds;
 
+  const canTakeAttendance = mayMarkAttendance(s, u) && attendanceBlock(s) === null;
   const open = s.status === "scheduled" && hoursUntil(s.startsAt) > 0 && !s.pendingRequestId;
   const permitted = open && hasReschedulePermission(s, u);
   const blocked = permitted ? blockedReason(s, u) : null;
@@ -274,6 +306,8 @@ function toSession(s: MockSession, u: MockUser): Session {
     pendingRescheduleRequestId: s.pendingRequestId,
     canReschedule: permitted && !blocked,
     rescheduleBlockedReason: blocked,
+    canTakeAttendance,
+    attendancePending: canTakeAttendance && g.studentIds.some((id) => !attendanceOf(s.id).has(id)),
   };
 }
 
@@ -376,6 +410,24 @@ function periodHours(sessions: MockSession[], from: Date, to: Date): PeriodHours
   return hours;
 }
 
+/** Asistencia de un alumno en clases ya iniciadas y no canceladas; sin marcar no se asume nada. */
+function attendanceSummary(sessions: MockSession[], studentId: string, from: Date, to: Date): AttendanceSummary {
+  const summary = { attendedMinutes: 0, present: 0, late: 0, absent: 0, excused: 0, unmarked: 0 };
+  const now = Date.now();
+  for (const s of sessions) {
+    const start = new Date(s.startsAt);
+    if (start < from || start >= to || start.getTime() > now || s.status === "cancelled") continue;
+    const record = attendanceOf(s.id).get(studentId);
+    if (!record) {
+      summary.unmarked++;
+      continue;
+    }
+    summary[record.status]++;
+    if (record.status === "present" || record.status === "late") summary.attendedMinutes += minutesOf(s);
+  }
+  return summary;
+}
+
 function toGroupBrief(g: MockGroup): GroupBrief {
   return {
     id: g.id,
@@ -403,6 +455,7 @@ function toOverview(studentId: string, u: MockUser, from: Date, to: Date): Stude
     const mine = state.sessions.filter((s) => groupIds.has(s.classGroupId));
 
     const hours = periodHours(mine, from, to);
+    const attendance = attendanceSummary(mine, studentId, from, to);
 
     const next = mine
       .filter((s) => s.status === "scheduled" && new Date(s.startsAt).getTime() > now)
@@ -412,6 +465,7 @@ function toOverview(studentId: string, u: MockUser, from: Date, to: Date): Stude
       teacher: { id: teacherId, fullName: teacherById.get(teacherId)!.fullName },
       groups: teacherGroups.map(toGroupBrief),
       hours,
+      attendance,
       nextSessionAt: next?.startsAt ?? null,
     };
   });
@@ -754,6 +808,85 @@ export function decideRescheduleRequest(
     );
   }
   return { ok: true, value: toRequest(r, u) };
+}
+
+// ---------------------------------------------------------------------------
+// Asistencia
+// ---------------------------------------------------------------------------
+
+const ATTENDANCE_STATUSES: AttendanceStatus[] = ["present", "late", "absent", "excused"];
+
+function attendanceRecords(s: MockSession, u: MockUser): AttendanceRecord[] {
+  const g = groupOf(s);
+  // Una familia ve solo a sus hijos; el resto, a todos los de la clase.
+  const visible =
+    u.role === "guardian" || u.role === "student"
+      ? g.studentIds.filter((id) => u.studentIds.includes(id))
+      : g.studentIds;
+  return visible
+    .map((id) => {
+      const record = attendanceOf(s.id).get(id);
+      return {
+        studentId: id,
+        fullName: studentById.get(id)!.fullName,
+        status: record?.status ?? null,
+        note: record?.note ?? null,
+        agreedInAdvance: record?.agreedInAdvance ?? false,
+      };
+    })
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+}
+
+export function getAttendance(sessionId: string): Result<AttendanceRecord[]> {
+  const u = currentUser();
+  const s = sessionById(sessionId);
+  if (!s || !canSeeSession(s, u)) return fail(404, "not_found", "La sesión no existe");
+  return { ok: true, value: attendanceRecords(s, u) };
+}
+
+export interface AttendanceInput {
+  studentId: string;
+  status: AttendanceStatus;
+  note?: string | null;
+  agreedInAdvance?: boolean;
+}
+
+export function saveAttendance(sessionId: string, records: AttendanceInput[]): Result<AttendanceRecord[]> {
+  const u = currentUser();
+  const s = sessionById(sessionId);
+  if (!s || !canSeeSession(s, u)) return fail(404, "not_found", "La sesión no existe");
+  if (!mayMarkAttendance(s, u)) return fail(403, "forbidden", "No puedes marcar la asistencia de esta clase");
+
+  const blocked = attendanceBlock(s);
+  if (blocked) return fail(409, "attendance_closed", blocked);
+
+  const classStudents = new Set(groupOf(s).studentIds);
+  for (const r of records) {
+    if (!classStudents.has(r.studentId)) {
+      return fail(400, "unknown_student", "Hay un alumno que no pertenece a esta clase");
+    }
+    if (!ATTENDANCE_STATUSES.includes(r.status)) return fail(400, "bad_request", "Estado de asistencia no válido");
+    if (r.agreedInAdvance && r.status !== "excused") {
+      return fail(400, "bad_request", "Solo una ausencia justificada puede marcarse como acordada con el profesor");
+    }
+  }
+
+  const current = attendanceBySession.get(s.id) ?? new Map<string, MockAttendance>();
+  for (const r of records) {
+    current.set(r.studentId, {
+      sessionId: s.id,
+      studentId: r.studentId,
+      status: r.status,
+      note: r.note?.trim() || null,
+      agreedInAdvance: !!r.agreedInAdvance,
+    });
+  }
+  attendanceBySession.set(s.id, current);
+
+  // Una clase que ya empezó y se marca queda como realizada.
+  if (s.status === "scheduled") s.status = "completed";
+
+  return { ok: true, value: attendanceRecords(s, u) };
 }
 
 // ---------------------------------------------------------------------------

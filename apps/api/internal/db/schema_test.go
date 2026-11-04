@@ -251,6 +251,39 @@ func TestOwnAccountMinAgeDefaultsTo18(t *testing.T) {
 	}
 }
 
+func TestAttendanceAgreedInAdvanceOnlyWhenExcused(t *testing.T) {
+	pool := testdb.New(t)
+	f := setup(t, pool)
+	ctx := context.Background()
+
+	var sessionID string
+	if err := pool.QueryRow(ctx,
+		`INSERT INTO sessions(academy_id,class_group_id,teacher_id,starts_at,ends_at)
+		 VALUES ($1,$2,$3,'2026-03-02 16:00-03','2026-03-02 16:45-03') RETURNING id`,
+		f.academy, f.group, f.teacher1).Scan(&sessionID); err != nil {
+		t.Fatal(err)
+	}
+
+	mark := func(status string, agreed bool) error {
+		_, err := pool.Exec(ctx,
+			`INSERT INTO attendance(session_id,student_id,status,agreed_in_advance)
+			 VALUES ($1,$2,$3,$4)
+			 ON CONFLICT (session_id,student_id)
+			 DO UPDATE SET status = EXCLUDED.status, agreed_in_advance = EXCLUDED.agreed_in_advance`,
+			sessionID, f.student, status, agreed)
+		return err
+	}
+
+	wantCode(t, mark("absent", true), checkViolation)
+	wantCode(t, mark("present", true), checkViolation)
+	if err := mark("excused", true); err != nil {
+		t.Fatalf("una ausencia justificada y acordada es válida: %v", err)
+	}
+	if err := mark("absent", false); err != nil {
+		t.Fatalf("una ausencia sin acuerdo es válida: %v", err)
+	}
+}
+
 func TestMigrationsApplyCleanly(t *testing.T) {
 	pool := testdb.New(t)
 

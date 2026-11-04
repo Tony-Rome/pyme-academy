@@ -456,10 +456,19 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AttendanceRecord"
+        "400":
+          $ref: "#/components/responses/BadRequest"
         "403":
           $ref: "#/components/responses/Forbidden"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: |
+            La asistencia no se puede marcar ahora: la clase aún no empieza, está cancelada
+            o pasaron más de 7 días desde que terminó.
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Problem" }
 
   /notifications:
     get:
@@ -749,16 +758,34 @@ components:
           type: integer
           minimum: 0
 
+    AttendanceSummary:
+      type: object
+      description: |
+        Asistencia de un alumno en el período, solo de clases que ya empezaron y no se cancelaron.
+        Un alumno sin marcar cuenta en `unmarked`; no se asume presente ni ausente.
+      required: [attendedMinutes, present, late, absent, excused, unmarked]
+      properties:
+        attendedMinutes:
+          type: integer
+          minimum: 0
+          description: Minutos de las clases en que estuvo presente o atrasado
+        present: { type: integer, minimum: 0 }
+        late: { type: integer, minimum: 0 }
+        absent: { type: integer, minimum: 0 }
+        excused: { type: integer, minimum: 0 }
+        unmarked: { type: integer, minimum: 0 }
+
     StudentTeacherLink:
       type: object
       description: La relación de un alumno con un profesor.
-      required: [teacher, groups, hours]
+      required: [teacher, groups, hours, attendance]
       properties:
         teacher: { $ref: "#/components/schemas/TeacherRef" }
         groups:
           type: array
           items: { $ref: "#/components/schemas/GroupBrief" }
         hours: { $ref: "#/components/schemas/PeriodHours" }
+        attendance: { $ref: "#/components/schemas/AttendanceSummary" }
         nextSessionAt:
           type: string
           format: date-time
@@ -783,7 +810,7 @@ components:
 
     Session:
       type: object
-      required: [id, classGroupId, groupName, instrument, teacherId, teacherName, startsAt, endsAt, status, students, canReschedule]
+      required: [id, classGroupId, groupName, instrument, teacherId, teacherName, startsAt, endsAt, status, students, canReschedule, canTakeAttendance, attendancePending]
       properties:
         id: { type: string, format: uuid }
         classGroupId: { type: string, format: uuid }
@@ -822,6 +849,16 @@ components:
           description: |
             Si quien consulta tendría permiso pero una regla de la academia lo impide
             (anticipación mínima, tope mensual), explica por qué. null en cualquier otro caso.
+        canTakeAttendance:
+          type: boolean
+          description: |
+            Quien consulta puede marcar asistencia ahora: dicta la clase (o es dirección), la clase
+            ya empezó, no está cancelada y no pasaron más de 7 días desde que terminó.
+        attendancePending:
+          type: boolean
+          description: |
+            Solo es true para quien puede marcar asistencia: la clase ya empezó y hay
+            alumnos sin marcar.
 
     CancelInput:
       type: object
@@ -891,7 +928,7 @@ components:
 
     AttendanceRecord:
       type: object
-      required: [studentId, fullName]
+      required: [studentId, fullName, agreedInAdvance]
       properties:
         studentId: { type: string, format: uuid }
         fullName: { type: string }
@@ -901,6 +938,11 @@ components:
           nullable: true
           description: null mientras no se haya marcado
         note: { type: string, nullable: true }
+        agreedInAdvance:
+          type: boolean
+          description: |
+            Ausencia acordada de antemano con el profesor. Solo puede ser true cuando el
+            estado es `excused`. La fase 1 solo la registra; los créditos llegan en la fase 2.
 
     AttendanceInput:
       type: object
@@ -915,6 +957,10 @@ components:
               studentId: { type: string, format: uuid }
               status: { $ref: "#/components/schemas/AttendanceStatus" }
               note: { type: string, nullable: true }
+              agreedInAdvance:
+                type: boolean
+                default: false
+                description: Solo es válido con el estado `excused`; con otro estado el servidor responde 400.
 
     Notification:
       type: object

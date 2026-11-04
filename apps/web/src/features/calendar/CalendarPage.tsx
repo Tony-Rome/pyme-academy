@@ -10,6 +10,7 @@ import { useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { instrumentKey } from "@/lib/format";
 import type { Session } from "@/lib/types";
+import { AttendanceDialog } from "@/features/attendance/AttendanceDialog";
 import { RescheduleDialog } from "@/features/reschedule/RescheduleDialog";
 import { useViewer } from "@/features/viewer/useViewer";
 import { CalendarFilters } from "./CalendarFilters";
@@ -32,7 +33,11 @@ function toEvent(s: Session): EventInput {
     title: s.groupName,
     start: s.startsAt,
     end: s.endsAt,
-    classNames: [`inst-${instrumentKey(s.instrument)}`, ...(s.status === "cancelled" ? ["session-cancelled"] : [])],
+    classNames: [
+      `inst-${instrumentKey(s.instrument)}`,
+      ...(s.status === "cancelled" ? ["session-cancelled"] : []),
+      ...(s.attendancePending ? ["attendance-pending"] : []),
+    ],
     extendedProps: { session: s },
   };
 }
@@ -48,7 +53,14 @@ function renderEvent(arg: EventContentArg, showTeacher: boolean) {
   const type = arg.view.type;
 
   if (type === "listWeek") {
-    const details = [s.roomName ?? "Sin sala", s.teacherName, studentsLabel(s)].filter(Boolean).join(" · ");
+    const details = [
+      s.roomName ?? "Sin sala",
+      s.teacherName,
+      studentsLabel(s),
+      s.attendancePending ? "Asistencia por marcar" : "",
+    ]
+      .filter(Boolean)
+      .join(" · ");
     return (
       <div>
         <div className="session-title font-medium">
@@ -122,6 +134,9 @@ export function CalendarPage() {
   const selected = sessions.data?.find((s) => s.id === selectedId) ?? null;
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
   const rescheduling = sessions.data?.find((s) => s.id === reschedulingId) ?? null;
+  const [attendanceId, setAttendanceId] = useState<string | null>(null);
+  const takingAttendance = sessions.data?.find((s) => s.id === attendanceId) ?? null;
+  const pendingAttendance = sessions.data?.some((s) => s.attendancePending) ?? false;
 
   // La vista de semana muestra solo las horas con clases (con un margen), para no
   // dejar la mañana vacía en academias que enseñan por la tarde.
@@ -194,6 +209,13 @@ export function CalendarPage() {
         </div>
       </div>
 
+      {pendingAttendance && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <span className="inline-block size-2 rounded-full bg-destructive" aria-hidden />
+          Asistencia por marcar: abre la clase marcada con el punto rojo.
+        </p>
+      )}
+
       {sessions.isError && (
         <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 p-3 text-sm">
           No se pudieron cargar las clases.{" "}
@@ -231,12 +253,17 @@ export function CalendarPage() {
       <SessionDialog
         session={selected}
         onClose={() => setSelectedId(null)}
+        onTakeAttendance={(s) => {
+          setSelectedId(null);
+          setAttendanceId(s.id);
+        }}
         onReschedule={(s) => {
           setSelectedId(null);
           setReschedulingId(s.id);
         }}
       />
       <RescheduleDialog session={rescheduling} onClose={() => setReschedulingId(null)} />
+      <AttendanceDialog session={takingAttendance} onClose={() => setAttendanceId(null)} />
     </div>
   );
 }

@@ -518,11 +518,25 @@ export interface components {
             completedMinutes: number;
             cancelledMinutes: number;
         };
+        /**
+         * @description Asistencia de un alumno en el período, solo de clases que ya empezaron y no se cancelaron.
+         *     Un alumno sin marcar cuenta en `unmarked`; no se asume presente ni ausente.
+         */
+        AttendanceSummary: {
+            /** @description Minutos de las clases en que estuvo presente o atrasado */
+            attendedMinutes: number;
+            present: number;
+            late: number;
+            absent: number;
+            excused: number;
+            unmarked: number;
+        };
         /** @description La relación de un alumno con un profesor. */
         StudentTeacherLink: {
             teacher: components["schemas"]["TeacherRef"];
             groups: components["schemas"]["GroupBrief"][];
             hours: components["schemas"]["PeriodHours"];
+            attendance: components["schemas"]["AttendanceSummary"];
             /**
              * Format: date-time
              * @description Próxima clase programada con este profesor (en cualquier fecha futura)
@@ -578,6 +592,16 @@ export interface components {
              *     (anticipación mínima, tope mensual), explica por qué. null en cualquier otro caso.
              */
             rescheduleBlockedReason?: string | null;
+            /**
+             * @description Quien consulta puede marcar asistencia ahora: dicta la clase (o es dirección), la clase
+             *     ya empezó, no está cancelada y no pasaron más de 7 días desde que terminó.
+             */
+            canTakeAttendance: boolean;
+            /**
+             * @description Solo es true para quien puede marcar asistencia: la clase ya empezó y hay
+             *     alumnos sin marcar.
+             */
+            attendancePending: boolean;
         };
         CancelInput: {
             reason: string;
@@ -647,6 +671,11 @@ export interface components {
             /** @description null mientras no se haya marcado */
             status?: components["schemas"]["AttendanceStatus"] | null;
             note?: string | null;
+            /**
+             * @description Ausencia acordada de antemano con el profesor. Solo puede ser true cuando el
+             *     estado es `excused`. La fase 1 solo la registra; los créditos llegan en la fase 2.
+             */
+            agreedInAdvance: boolean;
         };
         AttendanceInput: {
             records: {
@@ -654,6 +683,11 @@ export interface components {
                 studentId: string;
                 status: components["schemas"]["AttendanceStatus"];
                 note?: string | null;
+                /**
+                 * @description Solo es válido con el estado `excused`; con otro estado el servidor responde 400.
+                 * @default false
+                 */
+                agreedInAdvance: boolean;
             }[];
         };
         Notification: {
@@ -1243,8 +1277,21 @@ export interface operations {
                     "application/json": components["schemas"]["AttendanceRecord"][];
                 };
             };
+            400: components["responses"]["BadRequest"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
+            /**
+             * @description La asistencia no se puede marcar ahora: la clase aún no empieza, está cancelada
+             *     o pasaron más de 7 días desde que terminó.
+             */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
         };
     };
     listNotifications: {

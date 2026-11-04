@@ -170,16 +170,21 @@ func (e SessionStatus) Valid() bool {
 // AttendanceInput defines model for AttendanceInput.
 type AttendanceInput struct {
 	Records []struct {
-		Note      *string            `json:"note,omitempty"`
-		Status    AttendanceStatus   `json:"status"`
-		StudentId openapi_types.UUID `json:"studentId"`
+		// AgreedInAdvance Solo es válido con el estado `excused`; con otro estado el servidor responde 400.
+		AgreedInAdvance *bool              `json:"agreedInAdvance,omitempty"`
+		Note            *string            `json:"note,omitempty"`
+		Status          AttendanceStatus   `json:"status"`
+		StudentId       openapi_types.UUID `json:"studentId"`
 	} `json:"records"`
 }
 
 // AttendanceRecord defines model for AttendanceRecord.
 type AttendanceRecord struct {
-	FullName string  `json:"fullName"`
-	Note     *string `json:"note,omitempty"`
+	// AgreedInAdvance Ausencia acordada de antemano con el profesor. Solo puede ser true cuando el
+	// estado es `excused`. La fase 1 solo la registra; los créditos llegan en la fase 2.
+	AgreedInAdvance bool    `json:"agreedInAdvance"`
+	FullName        string  `json:"fullName"`
+	Note            *string `json:"note,omitempty"`
 
 	// Status null mientras no se haya marcado
 	Status    *AttendanceStatus  `json:"status,omitempty"`
@@ -188,6 +193,19 @@ type AttendanceRecord struct {
 
 // AttendanceStatus defines model for AttendanceStatus.
 type AttendanceStatus string
+
+// AttendanceSummary Asistencia de un alumno en el período, solo de clases que ya empezaron y no se cancelaron.
+// Un alumno sin marcar cuenta en `unmarked`; no se asume presente ni ausente.
+type AttendanceSummary struct {
+	Absent int `json:"absent"`
+
+	// AttendedMinutes Minutos de las clases en que estuvo presente o atrasado
+	AttendedMinutes int `json:"attendedMinutes"`
+	Excused         int `json:"excused"`
+	Late            int `json:"late"`
+	Present         int `json:"present"`
+	Unmarked        int `json:"unmarked"`
+}
 
 // CancelInput defines model for CancelInput.
 type CancelInput struct {
@@ -345,15 +363,23 @@ type Room struct {
 
 // Session defines model for Session.
 type Session struct {
+	// AttendancePending Solo es true para quien puede marcar asistencia: la clase ya empezó y hay
+	// alumnos sin marcar.
+	AttendancePending bool `json:"attendancePending"`
+
 	// CanReschedule Quien consulta puede proponer o aplicar un cambio de horario ahora.
 	// Las reglas viven en el servidor; el cliente solo las muestra.
-	CanReschedule bool               `json:"canReschedule"`
-	CancelReason  *string            `json:"cancelReason,omitempty"`
-	ClassGroupId  openapi_types.UUID `json:"classGroupId"`
-	EndsAt        time.Time          `json:"endsAt"`
-	GroupName     string             `json:"groupName"`
-	Id            openapi_types.UUID `json:"id"`
-	Instrument    string             `json:"instrument"`
+	CanReschedule bool `json:"canReschedule"`
+
+	// CanTakeAttendance Quien consulta puede marcar asistencia ahora: dicta la clase (o es dirección), la clase
+	// ya empezó, no está cancelada y no pasaron más de 7 días desde que terminó.
+	CanTakeAttendance bool               `json:"canTakeAttendance"`
+	CancelReason      *string            `json:"cancelReason,omitempty"`
+	ClassGroupId      openapi_types.UUID `json:"classGroupId"`
+	EndsAt            time.Time          `json:"endsAt"`
+	GroupName         string             `json:"groupName"`
+	Id                openapi_types.UUID `json:"id"`
+	Instrument        string             `json:"instrument"`
 
 	// OriginalTeacherId Profesor titular cuando la sesión tiene reemplazo
 	OriginalTeacherId          *openapi_types.UUID `json:"originalTeacherId,omitempty"`
@@ -395,7 +421,10 @@ type StudentRef struct {
 
 // StudentTeacherLink La relación de un alumno con un profesor.
 type StudentTeacherLink struct {
-	Groups []GroupBrief `json:"groups"`
+	// Attendance Asistencia de un alumno en el período, solo de clases que ya empezaron y no se cancelaron.
+	// Un alumno sin marcar cuenta en `unmarked`; no se asume presente ni ausente.
+	Attendance AttendanceSummary `json:"attendance"`
+	Groups     []GroupBrief      `json:"groups"`
 
 	// Hours Minutos de clase del período. Las canceladas no cuentan como realizadas.
 	// Una clase con reemplazo cuenta en la relación con el profesor titular del grupo.
@@ -2067,6 +2096,20 @@ func (response SaveAttendance200JSONResponse) VisitSaveAttendanceResponse(w http
 	return err
 }
 
+type SaveAttendance400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response SaveAttendance400JSONResponse) VisitSaveAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type SaveAttendance403JSONResponse struct{ ForbiddenJSONResponse }
 
 func (response SaveAttendance403JSONResponse) VisitSaveAttendanceResponse(w http.ResponseWriter) error {
@@ -2091,6 +2134,20 @@ func (response SaveAttendance404JSONResponse) VisitSaveAttendanceResponse(w http
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type SaveAttendance409JSONResponse Problem
+
+func (response SaveAttendance409JSONResponse) VisitSaveAttendanceResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(409)
 	_, err := buf.WriteTo(w)
 	return err
 }

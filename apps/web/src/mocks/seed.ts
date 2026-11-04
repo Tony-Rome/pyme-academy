@@ -1,6 +1,6 @@
 // Datos de ejemplo para la API simulada. Se generan relativos a la semana actual
 // para que el calendario siempre tenga clases pasadas y futuras.
-import type { Role, SessionStatus } from "@/lib/types";
+import type { AttendanceStatus, Role, SessionStatus } from "@/lib/types";
 
 export interface MockUser {
   id: string;
@@ -165,7 +165,16 @@ function at(base: Date, dayOffset: number, hhmm: string): Date {
   return d;
 }
 
+export interface MockAttendance {
+  sessionId: string;
+  studentId: string;
+  status: AttendanceStatus;
+  note: string | null;
+  agreedInAdvance: boolean;
+}
+
 export interface SeedData {
+  attendance: MockAttendance[];
   sessions: MockSession[];
   requests: MockRequest[];
   notifications: MockNotification[];
@@ -254,5 +263,26 @@ export function buildSeed(now = new Date()): SeedData {
     },
   ];
 
-  return { sessions, requests: [request], notifications };
+  // Asistencia de las clases ya realizadas. Las de las últimas 24 horas quedan sin marcar
+  // a propósito, para que la demo muestre cómo se ve lo pendiente.
+  const attendance: MockAttendance[] = [];
+  const dayAgo = now.getTime() - 24 * 3_600_000;
+  sessions.forEach((session, si) => {
+    if (session.status !== "completed" || new Date(session.endsAt).getTime() > dayAgo) return;
+    const group = groups.find((g) => g.id === session.classGroupId)!;
+    group.studentIds.forEach((studentId, i) => {
+      const roll = (si * 7 + i * 13) % 10;
+      const status: AttendanceStatus =
+        roll === 0 ? "absent" : roll === 1 ? "late" : roll === 2 ? "excused" : "present";
+      attendance.push({
+        sessionId: session.id,
+        studentId,
+        status,
+        note: null,
+        agreedInAdvance: status === "excused" && (si + i) % 2 === 0,
+      });
+    });
+  });
+
+  return { attendance, sessions, requests: [request], notifications };
 }

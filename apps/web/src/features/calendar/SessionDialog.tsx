@@ -2,6 +2,7 @@ import { CalendarClock, Clock, DoorOpen, GraduationCap, Users } from "lucide-rea
 import { Link } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { AttendanceSection } from "@/features/attendance/AttendanceSection";
 import {
   Dialog,
   DialogContent,
@@ -22,9 +23,10 @@ interface Props {
   session: Session | null;
   onClose: () => void;
   onReschedule: (session: Session) => void;
+  onTakeAttendance: (session: Session) => void;
 }
 
-export function SessionDialog({ session, onClose, onReschedule }: Props) {
+export function SessionDialog({ session, onClose, onReschedule, onTakeAttendance }: Props) {
   return (
     <Dialog open={!!session} onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
@@ -73,6 +75,8 @@ export function SessionDialog({ session, onClose, onReschedule }: Props) {
                   : "Sin alumnos inscritos"}
               </Row>
             </dl>
+
+            <AttendanceSection session={session} onTake={onTakeAttendance} />
 
             {session.pendingRescheduleRequestId && (
               <Link to="/solicitudes" className="text-sm underline" onClick={onClose}>

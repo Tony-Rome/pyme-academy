@@ -103,7 +103,21 @@ Formato: *Como [rol], quiero [acción], para [beneficio].*
 - Marcado en un toque por alumno; "todos presentes" como atajo.
 - Se puede editar hasta 7 días después.
 
+**Reglas de la asistencia** (las aplica el servidor; la interfaz solo las muestra):
+- **Quién marca:** el profesor que dicta la clase (con reemplazo, quien la dicta) y dirección. Las familias solo ven.
+- **Cuándo:** desde que empieza la clase y hasta 7 días después de que termina. Antes de empezar o pasado ese plazo, el servidor responde 409. Una clase cancelada no tiene asistencia.
+- **Estados:** presente, atrasado, ausente y justificado. Un alumno sin marcar queda "sin marcar" (no se asume nada).
+- **Ausencia acordada:** un alumno justificado puede marcarse además como "acordada con el profesor" (decisión 3 de las decisiones pendientes). En la fase 1 solo se registra; los créditos de recuperación se calculan en la fase 2.
+- **Al guardar:** si la clase ya había empezado y estaba "programada", pasa a "realizada".
+- **Visibilidad:** una familia ve solo a sus hijos; un profesor, a los alumnos de las clases que dicta.
+- **Pendiente:** el calendario señala con un punto las clases que ya empezaron y tienen alumnos sin marcar, a quienes pueden marcarlas.
+
+**F1b (M).** Como profesor, quiero marcar un alumno como justificado y, si lo avisó antes con mi acuerdo, indicar que fue "acordada con el profesor", para distinguir una ausencia acordada de una sorpresa.
+- Solo se puede marcar "acordada" cuando el estado es justificado.
+
 **F2 (S).** Como apoderado, quiero ver la asistencia de mis hijos, para estar al tanto.
+- Dentro de cada clase que ya empezó, la familia ve el estado de cada uno de sus hijos.
+- En "Mis clases" ve el resumen del mes: clases a las que asistió, ausencias, justificadas, sin marcar y horas asistidas.
 
 **F3 (S).** Como director, quiero un reporte de asistencia por alumno, grupo y profesor, con exportación a CSV.
 
@@ -261,8 +275,9 @@ El calendario responde cuándo y dónde. Esta épica responde **con quién y cu�
 
 **N10 (S).** Como director, quiero pasar del detalle de un alumno al de cada uno de sus profesores, y del detalle de un profesor a cada uno de sus alumnos, para recorrer la academia sin volver al menú.
 
-**N6 (C).** Como profesor o apoderado, quiero ver también las horas a las que el alumno asistió, para comparar lo programado con lo que realmente ocurrió.
-- Depende de la asistencia (F1).
+**N6 (S).** Como profesor o apoderado, quiero ver también las horas a las que el alumno asistió, para comparar lo programado con lo que realmente ocurrió.
+- Horas asistidas: minutos de las clases del período en que el alumno estuvo presente o atrasado.
+- Se muestra junto al resumen de asistencia de cada relación alumno-profesor.
 
 **N7 (C).** Como usuario, quiero saltar de una clase de esta lista a su lugar en el calendario, para ver el contexto.
 

@@ -20,3 +20,6 @@ export type StudentOverview = Schemas["StudentOverview"];
 export type StudentTeacherLink = Schemas["StudentTeacherLink"];
 export type GroupBrief = Schemas["GroupBrief"];
 export type PeriodHours = Schemas["PeriodHours"];
+export type AttendanceStatus = Schemas["AttendanceStatus"];
+export type AttendanceRecord = Schemas["AttendanceRecord"];
+export type AttendanceSummary = Schemas["AttendanceSummary"];

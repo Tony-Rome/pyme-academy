@@ -156,6 +156,28 @@ WHERE s.teacher_id = :profesor
 ```
 A diferencia de las horas de un alumno (que se agrupan por el profesor titular del grupo), aquí se cuenta quién **dictó** la clase: `sessions.teacher_id`. Es la base de la liquidación de honorarios de la fase 2.
 
+**Horas asistidas de un alumno con cada profesor** (completa las horas de la vista "Mis clases"):
+```sql
+SELECT g.teacher_id,
+       count(*) FILTER (WHERE a.status = 'present')  AS presentes,
+       count(*) FILTER (WHERE a.status = 'late')     AS atrasos,
+       count(*) FILTER (WHERE a.status = 'absent')   AS ausentes,
+       count(*) FILTER (WHERE a.status = 'excused')  AS justificadas,
+       count(*) FILTER (WHERE a.session_id IS NULL)  AS sin_marcar,
+       coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+                FILTER (WHERE a.status IN ('present', 'late')), 0) AS asistidas_min
+FROM enrollments e
+JOIN class_groups g ON g.id = e.class_group_id
+JOIN sessions s     ON s.class_group_id = g.id
+                   AND s.status <> 'cancelled'
+                   AND s.starts_at <= now()
+LEFT JOIN attendance a ON a.session_id = s.id AND a.student_id = e.student_id
+WHERE e.student_id = :student_id AND e.status = 'active'
+  AND s.starts_at >= :desde AND s.starts_at < :hasta
+GROUP BY g.teacher_id;
+```
+Solo cuentan clases ya iniciadas y no canceladas; si el alumno no tiene fila de asistencia, esa clase está "sin marcar".
+
 **Asistencia por alumno en un período:**
 ```sql
 SELECT st.full_name,

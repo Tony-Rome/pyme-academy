@@ -151,6 +151,18 @@ export const handlers = [
     }),
   ),
   http.get(
+    `${BASE}/sessions/:sessionId/attendance`,
+    authed(({ params }) => respond(store.getAttendance(String(params.sessionId)))),
+  ),
+  http.put(
+    `${BASE}/sessions/:sessionId/attendance`,
+    authed(async ({ params, request }) => {
+      const body = (await request.json().catch(() => null)) as { records?: unknown } | null;
+      if (!body || !Array.isArray(body.records)) return problem(400, "bad_request", "Falta la lista de registros");
+      return respond(store.saveAttendance(String(params.sessionId), body.records as store.AttendanceInput[]));
+    }),
+  ),
+  http.get(
     `${BASE}/reschedule-requests`,
     authed(({ request }) => {
       const status = new URL(request.url).searchParams.get("status");

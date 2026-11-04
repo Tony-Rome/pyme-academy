@@ -3,7 +3,7 @@ import { Link, type To } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, formatMinutes, formatSlot, formatTime } from "@/lib/format";
-import type { PeriodHours, StudentTeacherLink } from "@/lib/types";
+import type { AttendanceSummary, PeriodHours, StudentTeacherLink } from "@/lib/types";
 
 const KIND_LABELS = { individual: "Individual", group: "Grupal" } as const;
 
@@ -75,6 +75,7 @@ export function TeacherLinkCard({
         </p>
 
         <HoursSummary hours={link.hours} />
+        <AttendanceBlock summary={link.attendance} />
       </CardContent>
     </Card>
   );
@@ -90,6 +91,46 @@ export function HoursSummary({ hours }: { hours: PeriodHours }) {
         <Stat label="Por realizar" value={hours.scheduledMinutes} />
         <Stat label="Canceladas" value={hours.cancelledMinutes} muted />
       </dl>
+    </div>
+  );
+}
+
+/** Asistencia del período. Lo "sin marcar" se muestra aparte: no se asume presente ni ausente. */
+function AttendanceBlock({ summary }: { summary: AttendanceSummary }) {
+  const attended = summary.present + summary.late;
+  const marked = attended + summary.absent + summary.excused;
+  const nothingYet = marked === 0 && summary.unmarked === 0;
+
+  return (
+    <div>
+      <p className="mb-2 font-medium">Asistencia del mes</p>
+      {nothingYet ? (
+        <p className="text-muted-foreground">Todavía no hay clases realizadas este mes.</p>
+      ) : (
+        <>
+          {marked > 0 && (
+            <p className="mb-2">
+              Asistió a {attended} de {marked} {marked === 1 ? "clase marcada" : "clases marcadas"} (
+              {Math.round((attended / marked) * 100)} %).
+            </p>
+          )}
+          <dl className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+            <Stat label="Horas asistidas" value={summary.attendedMinutes} />
+            <CountStat label="Ausencias" value={summary.absent} />
+            <CountStat label="Justificadas" value={summary.excused} />
+            <CountStat label="Sin marcar" value={summary.unmarked} muted />
+          </dl>
+        </>
+      )}
+    </div>
+  );
+}
+
+function CountStat({ label, value, muted }: { label: string; value: number; muted?: boolean }) {
+  return (
+    <div className="rounded-md bg-muted p-2">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className={muted || value === 0 ? "text-muted-foreground" : "font-medium"}>{value}</dd>
     </div>
   );
 }

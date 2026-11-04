@@ -192,3 +192,18 @@
 .fc .fc-list-event {
   cursor: pointer;
 }
+
+/* Clases que ya empezaron y tienen alumnos sin marcar (solo para quien puede marcarlas). */
+.fc .attendance-pending {
+  position: relative;
+}
+.fc .attendance-pending::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 9999px;
+  background: var(--destructive);
+}
