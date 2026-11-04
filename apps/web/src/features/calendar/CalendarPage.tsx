@@ -6,12 +6,15 @@ import FullCalendar from "@fullcalendar/react";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
 import { Button } from "@/components/ui/button";
 import { instrumentKey } from "@/lib/format";
 import type { Session } from "@/lib/types";
 import { RescheduleDialog } from "@/features/reschedule/RescheduleDialog";
+import { useViewer } from "@/features/viewer/useViewer";
+import { CalendarFilters } from "./CalendarFilters";
 import { SessionDialog } from "./SessionDialog";
-import { useSessions, type DateRange } from "./useSessions";
+import { useSessions, type DateRange, type SessionFilters } from "./useSessions";
 
 type ViewName = "timeGridWeek" | "dayGridMonth" | "listWeek";
 
@@ -40,7 +43,7 @@ function studentsLabel(s: Session): string {
   return `${s.students.length} alumnos`;
 }
 
-function renderEvent(arg: EventContentArg) {
+function renderEvent(arg: EventContentArg, showTeacher: boolean) {
   const s = arg.event.extendedProps.session as Session;
   const type = arg.view.type;
 
@@ -70,7 +73,9 @@ function renderEvent(arg: EventContentArg) {
     <div className="overflow-hidden px-1 text-xs leading-tight">
       <div className="session-title truncate font-medium">{s.groupName}</div>
       <div className="truncate text-muted-foreground">{arg.timeText}</div>
-      <div className="truncate text-muted-foreground">{s.roomName}</div>
+      <div className="truncate text-muted-foreground">
+        {[s.roomName, showTeacher ? s.teacherName.split(" ")[0] : null].filter(Boolean).join(" · ")}
+      </div>
     </div>
   );
 }
@@ -82,7 +87,37 @@ export function CalendarPage() {
   const [view, setView] = useState<ViewName>(() => (isPhone() ? "listWeek" : "timeGridWeek"));
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  const sessions = useSessions(range);
+  const role = useViewer().data?.activeRole;
+  const isDirector = role === "director";
+  const showTeacher = role !== "teacher";
+
+  // Los filtros de dirección viajan en la dirección (?profesor=…&sala=…).
+  const [params, setParams] = useSearchParams();
+  const filters = useMemo<SessionFilters>(
+    () =>
+      isDirector
+        ? { teacherId: params.get("profesor") ?? undefined, roomId: params.get("sala") ?? undefined }
+        : {},
+    [isDirector, params],
+  );
+  const onFiltersChange = useCallback(
+    (next: SessionFilters) =>
+      setParams(
+        (prev) => {
+          const copy = new URLSearchParams(prev);
+          for (const [key, value] of [["profesor", next.teacherId], ["sala", next.roomId]] as const) {
+            if (value) copy.set(key, value);
+            else copy.delete(key);
+          }
+          return copy;
+        },
+        { replace: true },
+      ),
+    [setParams],
+  );
+
+  const sessions = useSessions(range, filters);
+  const eventContent = useCallback((arg: EventContentArg) => renderEvent(arg, showTeacher), [showTeacher]);
   const events = useMemo(() => (sessions.data ?? []).map(toEvent), [sessions.data]);
   const selected = sessions.data?.find((s) => s.id === selectedId) ?? null;
   const [reschedulingId, setReschedulingId] = useState<string | null>(null);
@@ -123,6 +158,8 @@ export function CalendarPage() {
 
   return (
     <div className="space-y-3">
+      {isDirector && <CalendarFilters value={filters} onChange={onFiltersChange} count={sessions.data?.length} />}
+
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1">
           <Button variant="outline" size="icon" aria-label="Anterior" onClick={() => calendar.current?.getApi().prev()}>
@@ -185,7 +222,7 @@ export function CalendarPage() {
           displayEventEnd
           events={events}
           datesSet={onDatesSet}
-          eventContent={renderEvent}
+          eventContent={eventContent}
           eventClick={onEventClick}
           noEventsContent="No hay clases en este período"
         />

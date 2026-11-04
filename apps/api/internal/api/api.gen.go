@@ -124,22 +124,22 @@ func (e RescheduleStatus) Valid() bool {
 
 // Defines values for Role.
 const (
-	RoleDirector Role = "director"
-	RoleGuardian Role = "guardian"
-	RoleStudent  Role = "student"
-	RoleTeacher  Role = "teacher"
+	Director Role = "director"
+	Guardian Role = "guardian"
+	Student  Role = "student"
+	Teacher  Role = "teacher"
 )
 
 // Valid indicates whether the value is a known member of the Role enum.
 func (e Role) Valid() bool {
 	switch e {
-	case RoleDirector:
+	case Director:
 		return true
-	case RoleGuardian:
+	case Guardian:
 		return true
-	case RoleStudent:
+	case Student:
 		return true
-	case RoleTeacher:
+	case Teacher:
 		return true
 	default:
 		return false
@@ -406,11 +406,49 @@ type StudentTeacherLink struct {
 	Teacher       TeacherRef `json:"teacher"`
 }
 
-// Teacher defines model for Teacher.
-type Teacher struct {
-	FullName    string             `json:"fullName"`
+// SubstitutionSummary defines model for SubstitutionSummary.
+type SubstitutionSummary struct {
+	// CoveredMinutes Minutos de clases de otros profesores que este cubrió
+	CoveredMinutes int `json:"coveredMinutes"`
+
+	// ReplacedMinutes Minutos de clases suyas que cubrieron otros profesores
+	ReplacedMinutes int `json:"replacedMinutes"`
+}
+
+// TeacherDetail defines model for TeacherDetail.
+type TeacherDetail struct {
+	Groups        []TeacherGroup      `json:"groups"`
+	Substitutions SubstitutionSummary `json:"substitutions"`
+	Teacher       TeacherOverview     `json:"teacher"`
+}
+
+// TeacherGroup defines model for TeacherGroup.
+type TeacherGroup struct {
+	Capacity int        `json:"capacity"`
+	Group    GroupBrief `json:"group"`
+
+	// Hours Minutos de clase del período. Las canceladas no cuentan como realizadas.
+	// Una clase con reemplazo cuenta en la relación con el profesor titular del grupo.
+	Hours    PeriodHours  `json:"hours"`
+	Students []StudentRef `json:"students"`
+}
+
+// TeacherOverview defines model for TeacherOverview.
+type TeacherOverview struct {
+	FullName   string `json:"fullName"`
+	GroupCount int    `json:"groupCount"`
+
+	// Hours Minutos de clase del período. Las canceladas no cuentan como realizadas.
+	// Una clase con reemplazo cuenta en la relación con el profesor titular del grupo.
+	Hours       PeriodHours        `json:"hours"`
 	Id          openapi_types.UUID `json:"id"`
 	Instruments []string           `json:"instruments"`
+
+	// NextSessionAt Próxima clase programada que dicta este profesor
+	NextSessionAt *time.Time `json:"nextSessionAt,omitempty"`
+
+	// StudentCount Alumnos distintos inscritos en sus grupos
+	StudentCount int `json:"studentCount"`
 }
 
 // TeacherRef defines model for TeacherRef.
@@ -466,6 +504,12 @@ type ListRescheduleRequestsParams struct {
 type ListSessionsParams struct {
 	From time.Time `form:"from" json:"from"`
 	To   time.Time `form:"to" json:"to"`
+
+	// TeacherId Solo las clases que dicta este profesor (reemplazos incluidos).
+	TeacherId *openapi_types.UUID `form:"teacherId,omitempty" json:"teacherId,omitempty"`
+
+	// RoomId Solo las clases que se hacen en esta sala.
+	RoomId *openapi_types.UUID `form:"roomId,omitempty" json:"roomId,omitempty"`
 }
 
 // ListStudentsParams defines parameters for ListStudents.
@@ -479,6 +523,24 @@ type ListStudentsParams struct {
 
 // GetStudentParams defines parameters for GetStudent.
 type GetStudentParams struct {
+	// From Inicio del período (incluido). Por defecto, el comienzo del mes actual.
+	From *OptionalFrom `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Fin del período (excluido). Por defecto, el comienzo del mes siguiente.
+	To *OptionalTo `form:"to,omitempty" json:"to,omitempty"`
+}
+
+// ListTeachersParams defines parameters for ListTeachers.
+type ListTeachersParams struct {
+	// From Inicio del período (incluido). Por defecto, el comienzo del mes actual.
+	From *OptionalFrom `form:"from,omitempty" json:"from,omitempty"`
+
+	// To Fin del período (excluido). Por defecto, el comienzo del mes siguiente.
+	To *OptionalTo `form:"to,omitempty" json:"to,omitempty"`
+}
+
+// GetTeacherParams defines parameters for GetTeacher.
+type GetTeacherParams struct {
 	// From Inicio del período (incluido). Por defecto, el comienzo del mes actual.
 	From *OptionalFrom `form:"from,omitempty" json:"from,omitempty"`
 
@@ -563,9 +625,12 @@ type ServerInterface interface {
 	// GetStudent Un alumno con sus profesores, clases y horas del período
 	// (GET /students/{studentId})
 	GetStudent(w http.ResponseWriter, r *http.Request, studentId openapi_types.UUID, params GetStudentParams)
-	// ListTeachers Profesores de la academia
+	// ListTeachers Todos los profesores de la academia con sus alumnos y horas del período (solo dirección)
 	// (GET /teachers)
-	ListTeachers(w http.ResponseWriter, r *http.Request)
+	ListTeachers(w http.ResponseWriter, r *http.Request, params ListTeachersParams)
+	// GetTeacher Un profesor con sus grupos, alumnos, horas y reemplazos del período (solo dirección)
+	// (GET /teachers/{teacherId})
+	GetTeacher(w http.ResponseWriter, r *http.Request, teacherId openapi_types.UUID, params GetTeacherParams)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -692,9 +757,15 @@ func (_ Unimplemented) GetStudent(w http.ResponseWriter, r *http.Request, studen
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
-// ListTeachers Profesores de la academia
+// ListTeachers Todos los profesores de la academia con sus alumnos y horas del período (solo dirección)
 // (GET /teachers)
-func (_ Unimplemented) ListTeachers(w http.ResponseWriter, r *http.Request) {
+func (_ Unimplemented) ListTeachers(w http.ResponseWriter, r *http.Request, params ListTeachersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// GetTeacher Un profesor con sus grupos, alumnos, horas y reemplazos del período (solo dirección)
+// (GET /teachers/{teacherId})
+func (_ Unimplemented) GetTeacher(w http.ResponseWriter, r *http.Request, teacherId openapi_types.UUID, params GetTeacherParams) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -935,6 +1006,32 @@ func (siw *ServerInterfaceWrapper) ListSessions(w http.ResponseWriter, r *http.R
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "teacherId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "teacherId", r.URL.Query(), &params.TeacherId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "teacherId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teacherId", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "roomId" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "roomId", r.URL.Query(), &params.RoomId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "roomId"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "roomId", Err: err})
 		}
 		return
 	}
@@ -1210,8 +1307,95 @@ func (siw *ServerInterfaceWrapper) GetStudent(w http.ResponseWriter, r *http.Req
 // ListTeachers operation middleware
 func (siw *ServerInterfaceWrapper) ListTeachers(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListTeachersParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ListTeachers(w, r)
+		siw.Handler.ListTeachers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTeacher operation middleware
+func (siw *ServerInterfaceWrapper) GetTeacher(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "teacherId" -------------
+	var teacherId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "teacherId", chi.URLParam(r, "teacherId"), &teacherId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: r.URL.RawPath == ""})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "teacherId", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params GetTeacherParams
+
+	// ------------- Optional query parameter "from" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "from", r.URL.Query(), &params.From, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "from"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "from", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "to" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "to", r.URL.Query(), &params.To, runtime.BindQueryParameterOptions{Type: "string", Format: "date-time"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "to"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "to", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTeacher(w, r, teacherId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1354,6 +1538,9 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/teachers", wrapper.ListTeachers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/teachers/{teacherId}", wrapper.GetTeacher)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/class-groups", wrapper.ListClassGroups)
@@ -2176,13 +2363,14 @@ func (response GetStudent404JSONResponse) VisitGetStudentResponse(w http.Respons
 }
 
 type ListTeachersRequestObject struct {
+	Params ListTeachersParams
 }
 
 type ListTeachersResponseObject interface {
 	VisitListTeachersResponse(w http.ResponseWriter) error
 }
 
-type ListTeachers200JSONResponse []Teacher
+type ListTeachers200JSONResponse []TeacherOverview
 
 func (response ListTeachers200JSONResponse) VisitListTeachersResponse(w http.ResponseWriter) error {
 
@@ -2192,6 +2380,99 @@ func (response ListTeachers200JSONResponse) VisitListTeachersResponse(w http.Res
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTeachers400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response ListTeachers400JSONResponse) VisitListTeachersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ListTeachers403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response ListTeachers403JSONResponse) VisitListTeachersResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTeacherRequestObject struct {
+	TeacherId openapi_types.UUID `json:"teacherId"`
+	Params    GetTeacherParams
+}
+
+type GetTeacherResponseObject interface {
+	VisitGetTeacherResponse(w http.ResponseWriter) error
+}
+
+type GetTeacher200JSONResponse TeacherDetail
+
+func (response GetTeacher200JSONResponse) VisitGetTeacherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTeacher400JSONResponse struct{ BadRequestJSONResponse }
+
+func (response GetTeacher400JSONResponse) VisitGetTeacherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTeacher403JSONResponse struct{ ForbiddenJSONResponse }
+
+func (response GetTeacher403JSONResponse) VisitGetTeacherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type GetTeacher404JSONResponse struct{ NotFoundJSONResponse }
+
+func (response GetTeacher404JSONResponse) VisitGetTeacherResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(404)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -2258,9 +2539,12 @@ type StrictServerInterface interface {
 	// GetStudent Un alumno con sus profesores, clases y horas del período
 	// (GET /students/{studentId})
 	GetStudent(ctx context.Context, request GetStudentRequestObject) (GetStudentResponseObject, error)
-	// ListTeachers Profesores de la academia
+	// ListTeachers Todos los profesores de la academia con sus alumnos y horas del período (solo dirección)
 	// (GET /teachers)
 	ListTeachers(ctx context.Context, request ListTeachersRequestObject) (ListTeachersResponseObject, error)
+	// GetTeacher Un profesor con sus grupos, alumnos, horas y reemplazos del período (solo dirección)
+	// (GET /teachers/{teacherId})
+	GetTeacher(ctx context.Context, request GetTeacherRequestObject) (GetTeacherResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -2843,8 +3127,10 @@ func (sh *strictHandler) GetStudent(w http.ResponseWriter, r *http.Request, stud
 }
 
 // ListTeachers operation middleware
-func (sh *strictHandler) ListTeachers(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ListTeachers(w http.ResponseWriter, r *http.Request, params ListTeachersParams) {
 	var request ListTeachersRequestObject
+
+	request.Params = params
 
 	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
 		return sh.ssi.ListTeachers(ctx, request.(ListTeachersRequestObject))
@@ -2859,6 +3145,33 @@ func (sh *strictHandler) ListTeachers(w http.ResponseWriter, r *http.Request) {
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ListTeachersResponseObject); ok {
 		if err := validResponse.VisitListTeachersResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// GetTeacher operation middleware
+func (sh *strictHandler) GetTeacher(w http.ResponseWriter, r *http.Request, teacherId openapi_types.UUID, params GetTeacherParams) {
+	var request GetTeacherRequestObject
+
+	request.TeacherId = teacherId
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.GetTeacher(ctx, request.(GetTeacherRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "GetTeacher")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(GetTeacherResponseObject); ok {
+		if err := validResponse.VisitGetTeacherResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -19,6 +19,7 @@ tags:
   - name: catalog
   - name: sessions
   - name: students
+  - name: teachers
   - name: reschedule
   - name: attendance
   - name: notifications
@@ -127,8 +128,14 @@ paths:
   /teachers:
     get:
       operationId: listTeachers
-      summary: Profesores de la academia
-      tags: [catalog]
+      summary: Todos los profesores de la academia con sus alumnos y horas del período (solo dirección)
+      description: |
+        Incluye a los profesores sin grupo propio que hayan dictado reemplazos.
+        Cualquier otro rol recibe 403. Sin `from` y `to`, el período es el mes actual.
+      tags: [teachers]
+      parameters:
+        - $ref: "#/components/parameters/OptionalFrom"
+        - $ref: "#/components/parameters/OptionalTo"
       responses:
         "200":
           description: OK
@@ -137,7 +144,36 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/Teacher"
+                  $ref: "#/components/schemas/TeacherOverview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+  /teachers/{teacherId}:
+    get:
+      operationId: getTeacher
+      summary: Un profesor con sus grupos, alumnos, horas y reemplazos del período (solo dirección)
+      tags: [teachers]
+      parameters:
+        - name: teacherId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/OptionalFrom"
+        - $ref: "#/components/parameters/OptionalTo"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeacherDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
   /class-groups:
     get:
       operationId: listClassGroups
@@ -208,6 +244,8 @@ paths:
       summary: Sesiones visibles para quien consulta, dentro de un rango
       description: |
         Dirección ve todas. Un profesor ve las suyas. Un apoderado ve las de sus pupilos.
+        Los filtros `teacherId` y `roomId` acotan lo que cada rol ya puede ver; nunca amplían
+        la visibilidad. Se pueden combinar.
       tags: [sessions]
       parameters:
         - name: from
@@ -218,6 +256,16 @@ paths:
           in: query
           required: true
           schema: { type: string, format: date-time }
+        - name: teacherId
+          in: query
+          required: false
+          description: Solo las clases que dicta este profesor (reemplazos incluidos).
+          schema: { type: string, format: uuid }
+        - name: roomId
+          in: query
+          required: false
+          description: Solo las clases que se hacen en esta sala.
+          schema: { type: string, format: uuid }
       responses:
         "200":
           description: OK
@@ -565,15 +613,68 @@ components:
         name: { type: string }
         capacity: { type: integer, minimum: 1 }
 
-    Teacher:
+    TeacherOverview:
       type: object
-      required: [id, fullName, instruments]
+      required: [id, fullName, instruments, studentCount, groupCount, hours]
       properties:
         id: { type: string, format: uuid }
         fullName: { type: string }
         instruments:
           type: array
           items: { type: string }
+        studentCount:
+          type: integer
+          minimum: 0
+          description: Alumnos distintos inscritos en sus grupos
+        groupCount:
+          type: integer
+          minimum: 0
+        hours:
+          $ref: "#/components/schemas/PeriodHours"
+          description: |
+            Horas que dictó o dictará en el período (por `teacher_id` de la sesión):
+            incluye reemplazos que cubrió y excluye las clases suyas que cubrió otra persona.
+        nextSessionAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Próxima clase programada que dicta este profesor
+
+    SubstitutionSummary:
+      type: object
+      required: [coveredMinutes, replacedMinutes]
+      properties:
+        coveredMinutes:
+          type: integer
+          minimum: 0
+          description: Minutos de clases de otros profesores que este cubrió
+        replacedMinutes:
+          type: integer
+          minimum: 0
+          description: Minutos de clases suyas que cubrieron otros profesores
+
+    TeacherGroup:
+      type: object
+      required: [group, capacity, students, hours]
+      properties:
+        group: { $ref: "#/components/schemas/GroupBrief" }
+        capacity: { type: integer, minimum: 1 }
+        students:
+          type: array
+          items: { $ref: "#/components/schemas/StudentRef" }
+        hours:
+          $ref: "#/components/schemas/PeriodHours"
+          description: Horas del grupo en el período, las dicte quien las dicte
+
+    TeacherDetail:
+      type: object
+      required: [teacher, groups, substitutions]
+      properties:
+        teacher: { $ref: "#/components/schemas/TeacherOverview" }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/TeacherGroup" }
+        substitutions: { $ref: "#/components/schemas/SubstitutionSummary" }
 
     GroupKind:
       type: string

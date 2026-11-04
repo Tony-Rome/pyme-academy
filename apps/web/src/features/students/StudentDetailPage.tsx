@@ -1,6 +1,7 @@
 import { ArrowLeft } from "lucide-react";
 import { Link, useLocation, useParams } from "react-router";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useViewer } from "@/features/viewer/useViewer";
 import { ApiError } from "@/lib/problem";
 import { useStudent } from "./hooks";
 import { MonthNav } from "./MonthNav";
@@ -13,6 +14,7 @@ export function StudentDetailPage() {
   const { ym, setYm } = useMonth();
   const student = useStudent(studentId, ym);
   const location = useLocation();
+  const isDirector = useViewer().data?.activeRole === "director";
 
   const back = (
     <Link
@@ -60,7 +62,14 @@ export function StudentDetailPage() {
 
       <div className="grid gap-3 md:grid-cols-2">
         {data.links.map((link) => (
-          <TeacherLinkCard key={link.teacher.id} link={link} headingLevel={2} />
+          <TeacherLinkCard
+            key={link.teacher.id}
+            link={link}
+            headingLevel={2}
+            teacherHref={
+              isDirector ? { pathname: `/profesores/${link.teacher.id}`, search: location.search } : undefined
+            }
+          />
         ))}
       </div>
     </div>

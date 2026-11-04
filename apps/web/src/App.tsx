@@ -6,6 +6,8 @@ import { RequireRole } from "@/features/auth/RequireRole";
 import { MyClassesPage } from "@/features/students/MyClassesPage";
 import { StudentDetailPage } from "@/features/students/StudentDetailPage";
 import { StudentsPage } from "@/features/students/StudentsPage";
+import { TeacherDetailPage } from "@/features/teachers/TeacherDetailPage";
+import { TeachersPage } from "@/features/teachers/TeachersPage";
 import { CalendarPage } from "@/features/calendar/CalendarPage";
 import { RequestsPage } from "@/features/reschedule/RequestsPage";
 
@@ -24,6 +26,10 @@ export function App() {
             <Route element={<RequireRole roles={["teacher", "director"]} />}>
               <Route path="alumnos" element={<StudentsPage />} />
               <Route path="alumnos/:studentId" element={<StudentDetailPage />} />
+            </Route>
+            <Route element={<RequireRole roles={["director"]} />}>
+              <Route path="profesores" element={<TeachersPage />} />
+              <Route path="profesores/:teacherId" element={<TeacherDetailPage />} />
             </Route>
             <Route element={<RequireRole roles={["guardian", "student"]} />}>
               <Route path="mis-clases" element={<MyClassesPage />} />

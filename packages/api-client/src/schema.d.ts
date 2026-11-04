@@ -117,8 +117,29 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Profesores de la academia */
+        /**
+         * Todos los profesores de la academia con sus alumnos y horas del período (solo dirección)
+         * @description Incluye a los profesores sin grupo propio que hayan dictado reemplazos.
+         *     Cualquier otro rol recibe 403. Sin `from` y `to`, el período es el mes actual.
+         */
         get: operations["listTeachers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teachers/{teacherId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Un profesor con sus grupos, alumnos, horas y reemplazos del período (solo dirección) */
+        get: operations["getTeacher"];
         put?: never;
         post?: never;
         delete?: never;
@@ -197,6 +218,8 @@ export interface paths {
         /**
          * Sesiones visibles para quien consulta, dentro de un rango
          * @description Dirección ve todas. Un profesor ve las suyas. Un apoderado ve las de sus pupilos.
+         *     Los filtros `teacherId` y `roomId` acotan lo que cada rol ya puede ver; nunca amplían
+         *     la visibilidad. Se pueden combinar.
          */
         get: operations["listSessions"];
         put?: never;
@@ -407,11 +430,42 @@ export interface components {
             name: string;
             capacity: number;
         };
-        Teacher: {
+        TeacherOverview: {
             /** Format: uuid */
             id: string;
             fullName: string;
             instruments: string[];
+            /** @description Alumnos distintos inscritos en sus grupos */
+            studentCount: number;
+            groupCount: number;
+            /**
+             * @description Horas que dictó o dictará en el período (por `teacher_id` de la sesión):
+             *     incluye reemplazos que cubrió y excluye las clases suyas que cubrió otra persona.
+             */
+            hours: components["schemas"]["PeriodHours"];
+            /**
+             * Format: date-time
+             * @description Próxima clase programada que dicta este profesor
+             */
+            nextSessionAt?: string | null;
+        };
+        SubstitutionSummary: {
+            /** @description Minutos de clases de otros profesores que este cubrió */
+            coveredMinutes: number;
+            /** @description Minutos de clases suyas que cubrieron otros profesores */
+            replacedMinutes: number;
+        };
+        TeacherGroup: {
+            group: components["schemas"]["GroupBrief"];
+            capacity: number;
+            students: components["schemas"]["StudentRef"][];
+            /** @description Horas del grupo en el período, las dicte quien las dicte */
+            hours: components["schemas"]["PeriodHours"];
+        };
+        TeacherDetail: {
+            teacher: components["schemas"]["TeacherOverview"];
+            groups: components["schemas"]["TeacherGroup"][];
+            substitutions: components["schemas"]["SubstitutionSummary"];
         };
         /** @enum {string} */
         GroupKind: "individual" | "group";
@@ -828,7 +882,12 @@ export interface operations {
     };
     listTeachers: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Inicio del período (incluido). Por defecto, el comienzo del mes actual. */
+                from?: components["parameters"]["OptionalFrom"];
+                /** @description Fin del período (excluido). Por defecto, el comienzo del mes siguiente. */
+                to?: components["parameters"]["OptionalTo"];
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -841,9 +900,41 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Teacher"][];
+                    "application/json": components["schemas"]["TeacherOverview"][];
                 };
             };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    getTeacher: {
+        parameters: {
+            query?: {
+                /** @description Inicio del período (incluido). Por defecto, el comienzo del mes actual. */
+                from?: components["parameters"]["OptionalFrom"];
+                /** @description Fin del período (excluido). Por defecto, el comienzo del mes siguiente. */
+                to?: components["parameters"]["OptionalTo"];
+            };
+            header?: never;
+            path: {
+                teacherId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeacherDetail"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
         };
     };
     listClassGroups: {
@@ -926,6 +1017,10 @@ export interface operations {
             query: {
                 from: string;
                 to: string;
+                /** @description Solo las clases que dicta este profesor (reemplazos incluidos). */
+                teacherId?: string;
+                /** @description Solo las clases que se hacen en esta sala. */
+                roomId?: string;
             };
             header?: never;
             path?: never;

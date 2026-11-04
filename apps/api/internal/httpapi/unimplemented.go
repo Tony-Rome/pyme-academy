@@ -87,3 +87,7 @@ func (s *Server) ListStudents(context.Context, api.ListStudentsRequestObject) (a
 func (s *Server) GetStudent(context.Context, api.GetStudentRequestObject) (api.GetStudentResponseObject, error) {
 	return nil, ErrNotImplemented
 }
+
+func (s *Server) GetTeacher(context.Context, api.GetTeacherRequestObject) (api.GetTeacherResponseObject, error) {
+	return nil, ErrNotImplemented
+}

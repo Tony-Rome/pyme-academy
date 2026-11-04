@@ -135,6 +135,27 @@ GROUP BY g.teacher_id, t.full_name;
 ```
 Se agrupa por el profesor **titular del grupo**, así una clase con reemplazo cuenta en la relación con el titular. Para el profesor, la consulta se filtra además por `g.teacher_id = :profesor`, de modo que nunca ve las horas del alumno con otros profesores.
 
+**Horas dictadas por un profesor en el mes** (vista "Profesores" de dirección):
+```sql
+SELECT
+  coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+           FILTER (WHERE s.status = 'scheduled'), 0) AS programadas_min,
+  coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+           FILTER (WHERE s.status = 'completed'), 0) AS realizadas_min,
+  coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+           FILTER (WHERE s.status = 'cancelled'), 0) AS canceladas_min,
+  -- reemplazos: lo que cubrió por otros y lo suyo que cubrieron otros
+  coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+           FILTER (WHERE s.teacher_id = :profesor AND s.original_teacher_id IS NOT NULL
+                   AND s.status <> 'cancelled'), 0) AS cubiertas_min
+FROM sessions s
+WHERE s.teacher_id = :profesor
+  AND s.starts_at >= :desde AND s.starts_at < :hasta;
+-- minutos propios cubiertos por otros:
+--   WHERE s.original_teacher_id = :profesor AND s.status <> 'cancelled'
+```
+A diferencia de las horas de un alumno (que se agrupan por el profesor titular del grupo), aquí se cuenta quién **dictó** la clase: `sessions.teacher_id`. Es la base de la liquidación de honorarios de la fase 2.
+
 **Asistencia por alumno en un período:**
 ```sql
 SELECT st.full_name,

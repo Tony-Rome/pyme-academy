@@ -54,7 +54,20 @@ export const handlers = [
   http.get(`${BASE}/me`, authed(() => HttpResponse.json(store.viewerPayload()))),
 
   http.get(`${BASE}/rooms`, authed(() => HttpResponse.json(store.listRooms()))),
-  http.get(`${BASE}/teachers`, authed(() => HttpResponse.json(store.listTeachers()))),
+  http.get(
+    `${BASE}/teachers`,
+    authed(({ request }) => {
+      const range = periodFrom(new URL(request.url));
+      return range ? respond(store.listTeachers(range.from, range.to)) : badPeriod();
+    }),
+  ),
+  http.get(
+    `${BASE}/teachers/:teacherId`,
+    authed(({ params, request }) => {
+      const range = periodFrom(new URL(request.url));
+      return range ? respond(store.getTeacher(String(params.teacherId), range.from, range.to)) : badPeriod();
+    }),
+  ),
   http.get(`${BASE}/class-groups`, authed(() => HttpResponse.json(store.listClassGroups()))),
 
   http.get(
@@ -83,7 +96,12 @@ export const handlers = [
       if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) {
         return problem(400, "bad_request", "from y to deben ser fechas válidas");
       }
-      return HttpResponse.json(store.listSessions(from, to));
+      return HttpResponse.json(
+        store.listSessions(from, to, {
+          teacherId: url.searchParams.get("teacherId"),
+          roomId: url.searchParams.get("roomId"),
+        }),
+      );
     }),
   ),
   http.get(

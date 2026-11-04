@@ -61,6 +61,12 @@ Formato: *Como [rol], quiero [acción], para [beneficio].*
 **D2 (M).** Como profesor, quiero ver mi calendario con alumnos y salas, para preparar mi jornada.
 
 **D3 (M).** Como director, quiero ver el calendario por sala y por profesor, para detectar huecos y sobreocupación.
+- Dos filtros sobre el mismo calendario: profesor y sala. Se pueden combinar y quitar con un clic.
+- El filtro profesor muestra lo que dicta esa persona, con los reemplazos que cubre y sin los que cubrió otra persona.
+- Los filtros viajan en la dirección (`?profesor=…&sala=…`), así se pueden compartir o recargar.
+- Con un filtro activo se indica cuántas clases se muestran en el período.
+- Cada clase del calendario muestra sala y profesor, para leer la ocupación sin abrirla.
+- Los filtros solo acotan lo que cada rol ya puede ver; no amplían permisos.
 
 **D4 (S).** Como usuario, quiero suscribir mi calendario a Google/Apple Calendar (enlace iCal), para verlo junto a mis otros compromisos.
 
@@ -244,6 +250,17 @@ El calendario responde cuándo y dónde. Esta épica responde **con quién y cu�
 
 **N5 (S).** Como director, quiero ver el mismo detalle de cualquier alumno, con todos sus profesores, para responder consultas de las familias.
 
+**N8 (S).** Como director, quiero ver la lista de todos los profesores de la academia, con sus instrumentos, cantidad de alumnos y grupos, horas dictadas del mes y próxima clase, para saber qué hace cada uno de un vistazo.
+- Incluye a profesores sin grupo propio que solo hayan dictado reemplazos.
+- Se puede buscar por nombre y cambiar de mes.
+- Solo dirección tiene esta vista: un profesor, una familia o un alumno reciben 403.
+
+**N9 (S).** Como director, quiero abrir un profesor y ver sus grupos (horario semanal, sala, nivel, cupo), los alumnos de cada grupo, las horas del mes y los reemplazos que dio o recibió, para tener el panorama completo.
+- Horas dictadas: las clases que ese profesor dictó o dictará, con reemplazos incluidos y sin las que cubrió otra persona.
+- Reemplazos: minutos que cubrió por otros y minutos de sus clases que cubrieron otros.
+
+**N10 (S).** Como director, quiero pasar del detalle de un alumno al de cada uno de sus profesores, y del detalle de un profesor a cada uno de sus alumnos, para recorrer la academia sin volver al menú.
+
 **N6 (C).** Como profesor o apoderado, quiero ver también las horas a las que el alumno asistió, para comparar lo programado con lo que realmente ocurrió.
 - Depende de la asistencia (F1).
 
@@ -255,7 +272,7 @@ El calendario responde cuándo y dónde. Esta épica responde **con quién y cu�
 1. A1–A3, B1–B2 (base).
 2. C1–C2, D1–D3, J1 (sin esto no hay producto).
 3. E1–E4, K1–K2, I1 (el diferenciador principal).
-4. F1, N1–N5, L1, M1–M5, H1–H3.
+4. F1, N1–N5, N8–N10, L1, M1–M5, H1–H3.
 5. A5 (importación), D4, y el resto de las S y C.
 
 ## Criterios de salida de la fase 1

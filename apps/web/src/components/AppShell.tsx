@@ -1,4 +1,4 @@
-import { CalendarDays, Inbox, LogOut, Music, Users } from "lucide-react";
+import { CalendarDays, GraduationCap, Inbox, LogOut, Music, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 import { ApiStatus } from "@/components/ApiStatus";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +19,12 @@ const REQUESTS: NavItem = { to: "/solicitudes", label: "Solicitudes", icon: Inbo
 function navFor(role: Role | undefined): NavItem[] {
   switch (role) {
     case "director":
-      return [CALENDAR, { to: "/alumnos", label: "Alumnos", icon: Users }, REQUESTS];
+      return [
+        CALENDAR,
+        { to: "/alumnos", label: "Alumnos", icon: Users },
+        { to: "/profesores", label: "Profesores", icon: GraduationCap },
+        REQUESTS,
+      ];
     case "teacher":
       return [CALENDAR, { to: "/alumnos", label: "Mis alumnos", icon: Users }, REQUESTS];
     default:

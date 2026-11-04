@@ -1,4 +1,5 @@
 import { CalendarClock, GraduationCap } from "lucide-react";
+import { Link, type To } from "react-router";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatDate, formatMinutes, formatSlot, formatTime } from "@/lib/format";
@@ -7,7 +8,16 @@ import type { PeriodHours, StudentTeacherLink } from "@/lib/types";
 const KIND_LABELS = { individual: "Individual", group: "Grupal" } as const;
 
 /** Un profesor con sus clases asignadas a un alumno y las horas del período. */
-export function TeacherLinkCard({ link, headingLevel = 3 }: { link: StudentTeacherLink; headingLevel?: 2 | 3 }) {
+export function TeacherLinkCard({
+  link,
+  headingLevel = 3,
+  teacherHref,
+}: {
+  link: StudentTeacherLink;
+  headingLevel?: 2 | 3;
+  /** Si se indica, el nombre del profesor lleva a su ficha (solo dirección). */
+  teacherHref?: To;
+}) {
   const Heading = `h${headingLevel}` as const;
   const instruments = [...new Set(link.groups.map((g) => g.instrument))];
 
@@ -17,7 +27,15 @@ export function TeacherLinkCard({ link, headingLevel = 3 }: { link: StudentTeach
         <div className="flex flex-wrap items-center gap-2">
           <GraduationCap className="size-4 text-muted-foreground" aria-hidden />
           <CardTitle>
-            <Heading>{link.teacher.fullName}</Heading>
+            <Heading>
+              {teacherHref ? (
+                <Link to={teacherHref} className="underline-offset-4 hover:underline">
+                  {link.teacher.fullName}
+                </Link>
+              ) : (
+                link.teacher.fullName
+              )}
+            </Heading>
           </CardTitle>
           {instruments.map((instrument) => (
             <Badge key={instrument} variant="outline">

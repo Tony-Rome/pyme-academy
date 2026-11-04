@@ -7,8 +7,12 @@ import type {
   RescheduleOption,
   RescheduleRequest,
   Session,
+  GroupBrief,
+  PeriodHours,
   StudentOverview,
   StudentTeacherLink,
+  TeacherDetail,
+  TeacherOverview,
   Viewer,
 } from "@/lib/types";
 import {
@@ -273,10 +277,17 @@ function toSession(s: MockSession, u: MockUser): Session {
   };
 }
 
-export function listSessions(from: Date, to: Date): Session[] {
+/** Los filtros solo acotan lo que el rol ya puede ver; nunca amplían la visibilidad. */
+export function listSessions(
+  from: Date,
+  to: Date,
+  filters: { teacherId?: string | null; roomId?: string | null } = {},
+): Session[] {
   const u = currentUser();
   return state.sessions
     .filter((s) => canSeeSession(s, u))
+    .filter((s) => !filters.teacherId || s.teacherId === filters.teacherId)
+    .filter((s) => !filters.roomId || s.roomId === filters.roomId)
     .filter((s) => new Date(s.endsAt) > from && new Date(s.startsAt) < to)
     .sort((a, b) => a.startsAt.localeCompare(b.startsAt))
     .map((s) => toSession(s, u));
@@ -292,9 +303,6 @@ export function listRooms() {
   return rooms;
 }
 
-export function listTeachers() {
-  return teachers;
-}
 
 export function listClassGroups(): ClassGroup[] {
   const u = currentUser();
@@ -355,6 +363,33 @@ function minutesOf(s: MockSession) {
   return Math.round((new Date(s.endsAt).getTime() - new Date(s.startsAt).getTime()) / 60_000);
 }
 
+/** Minutos de clase del período, por estado. Las canceladas no cuentan como realizadas. */
+function periodHours(sessions: MockSession[], from: Date, to: Date): PeriodHours {
+  const hours = { scheduledMinutes: 0, completedMinutes: 0, cancelledMinutes: 0 };
+  for (const s of sessions) {
+    const start = new Date(s.startsAt);
+    if (start < from || start >= to) continue;
+    if (s.status === "scheduled") hours.scheduledMinutes += minutesOf(s);
+    else if (s.status === "completed") hours.completedMinutes += minutesOf(s);
+    else hours.cancelledMinutes += minutesOf(s);
+  }
+  return hours;
+}
+
+function toGroupBrief(g: MockGroup): GroupBrief {
+  return {
+    id: g.id,
+    name: g.name,
+    instrument: g.instrument,
+    level: g.level,
+    kind: g.kind,
+    weekday: g.weekday,
+    startTime: g.startTime,
+    durationMinutes: g.durationMinutes,
+    roomName: roomById.get(g.roomId)?.name ?? null,
+  };
+}
+
 function toOverview(studentId: string, u: MockUser, from: Date, to: Date): StudentOverview {
   const student = studentById.get(studentId)!;
   const byTeacher = new Map<string, MockGroup[]>();
@@ -367,14 +402,7 @@ function toOverview(studentId: string, u: MockUser, from: Date, to: Date): Stude
     const groupIds = new Set(teacherGroups.map((g) => g.id));
     const mine = state.sessions.filter((s) => groupIds.has(s.classGroupId));
 
-    const hours = { scheduledMinutes: 0, completedMinutes: 0, cancelledMinutes: 0 };
-    for (const s of mine) {
-      const start = new Date(s.startsAt);
-      if (start < from || start >= to) continue;
-      if (s.status === "scheduled") hours.scheduledMinutes += minutesOf(s);
-      else if (s.status === "completed") hours.completedMinutes += minutesOf(s);
-      else hours.cancelledMinutes += minutesOf(s);
-    }
+    const hours = periodHours(mine, from, to);
 
     const next = mine
       .filter((s) => s.status === "scheduled" && new Date(s.startsAt).getTime() > now)
@@ -382,17 +410,7 @@ function toOverview(studentId: string, u: MockUser, from: Date, to: Date): Stude
 
     return {
       teacher: { id: teacherId, fullName: teacherById.get(teacherId)!.fullName },
-      groups: teacherGroups.map((g) => ({
-        id: g.id,
-        name: g.name,
-        instrument: g.instrument,
-        level: g.level,
-        kind: g.kind,
-        weekday: g.weekday,
-        startTime: g.startTime,
-        durationMinutes: g.durationMinutes,
-        roomName: roomById.get(g.roomId)?.name ?? null,
-      })),
+      groups: teacherGroups.map(toGroupBrief),
       hours,
       nextSessionAt: next?.startsAt ?? null,
     };
@@ -413,6 +431,77 @@ export function listStudents(from: Date, to: Date): StudentOverview[] {
 export function getStudent(id: string, from: Date, to: Date): StudentOverview | null {
   const u = currentUser();
   return studentById.has(id) && canSeeStudent(id, u) ? toOverview(id, u, from, to) : null;
+}
+
+// ---------------------------------------------------------------------------
+// Profesores (solo dirección)
+// ---------------------------------------------------------------------------
+
+const directorOnly = () => fail(403, "forbidden", "Solo dirección puede ver a los profesores.");
+
+/** Horas que el profesor dictó o dictará: por quien dicta la sesión, no por el titular del grupo. */
+function toTeacherOverview(t: (typeof teachers)[number], from: Date, to: Date): TeacherOverview {
+  const own = groups.filter((g) => g.teacherId === t.id);
+  const dictated = state.sessions.filter((s) => s.teacherId === t.id);
+  const next = dictated
+    .filter((s) => s.status === "scheduled" && new Date(s.startsAt).getTime() > Date.now())
+    .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+
+  return {
+    id: t.id,
+    fullName: t.fullName,
+    instruments: t.instruments,
+    studentCount: new Set(own.flatMap((g) => g.studentIds)).size,
+    groupCount: own.length,
+    hours: periodHours(dictated, from, to),
+    nextSessionAt: next?.startsAt ?? null,
+  };
+}
+
+export function listTeachers(from: Date, to: Date): Result<TeacherOverview[]> {
+  if (currentUser().role !== "director") return directorOnly();
+  const list = teachers
+    .map((t) => toTeacherOverview(t, from, to))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+  return { ok: true, value: list };
+}
+
+export function getTeacher(id: string, from: Date, to: Date): Result<TeacherDetail> {
+  if (currentUser().role !== "director") return directorOnly();
+  const t = teacherById.get(id);
+  if (!t) return fail(404, "not_found", "El profesor no existe");
+
+  const inRange = (s: MockSession) => {
+    const start = new Date(s.startsAt);
+    return start >= from && start < to && s.status !== "cancelled";
+  };
+  const sumMinutes = (list: MockSession[]) => list.reduce((sum, s) => sum + minutesOf(s), 0);
+
+  return {
+    ok: true,
+    value: {
+      teacher: toTeacherOverview(t, from, to),
+      groups: groups
+        .filter((g) => g.teacherId === id)
+        .map((g) => ({
+          group: toGroupBrief(g),
+          capacity: g.capacity,
+          students: g.studentIds
+            .map((sid) => studentById.get(sid)!)
+            .map((x) => ({ id: x.id, fullName: x.fullName }))
+            .sort((a, b) => a.fullName.localeCompare(b.fullName, "es")),
+          hours: periodHours(
+            state.sessions.filter((s) => s.classGroupId === g.id),
+            from,
+            to,
+          ),
+        })),
+      substitutions: {
+        coveredMinutes: sumMinutes(state.sessions.filter((s) => s.teacherId === id && s.originalTeacherId && inRange(s))),
+        replacedMinutes: sumMinutes(state.sessions.filter((s) => s.originalTeacherId === id && inRange(s))),
+      },
+    },
+  };
 }
 
 // ---------------------------------------------------------------------------
