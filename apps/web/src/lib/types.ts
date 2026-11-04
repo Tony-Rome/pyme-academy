@@ -14,3 +14,7 @@ export type RescheduleRequest = Schemas["RescheduleRequest"];
 export type Notification = Schemas["Notification"];
 export type RescheduleOption = Schemas["RescheduleOption"];
 export type RescheduleStatus = Schemas["RescheduleStatus"];
+export type StudentOverview = Schemas["StudentOverview"];
+export type StudentTeacherLink = Schemas["StudentTeacherLink"];
+export type GroupBrief = Schemas["GroupBrief"];
+export type PeriodHours = Schemas["PeriodHours"];

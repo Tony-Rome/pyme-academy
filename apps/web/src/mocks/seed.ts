@@ -28,6 +28,7 @@ export interface MockRoom {
 export interface MockStudent {
   id: string;
   fullName: string;
+  age: number;
 }
 
 export interface MockGroup {
@@ -120,9 +121,12 @@ const studentNames = [
   "Lucas Bravo", "Amanda Cortés", "Diego Olivares", "Renata Figueroa", "Felipe Maldonado",
 ];
 
+const studentAges = [9, 12, 8, 10, 9, 11, 13, 12, 10, 14, 9, 16, 10, 15, 11, 12, 9, 13, 8, 11];
+
 export const students: MockStudent[] = studentNames.map((fullName, i) => ({
   id: ID.student(i + 1),
   fullName,
+  age: studentAges[i],
 }));
 
 const s = (index: number) => ID.student(index + 1);
@@ -173,7 +177,7 @@ export function buildSeed(now = new Date()): SeedData {
   let n = 0;
 
   for (const g of groups) {
-    for (let week = -2; week <= 6; week++) {
+    for (let week = -2; week <= 12; week++) {
       const dayOffset = week * 7 + ((g.weekday + 6) % 7);
       const start = at(monday, dayOffset, g.startTime);
       const end = new Date(start.getTime() + g.durationMinutes * 60_000);

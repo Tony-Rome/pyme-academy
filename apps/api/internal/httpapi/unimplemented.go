@@ -79,3 +79,11 @@ func (s *Server) Login(context.Context, api.LoginRequestObject) (api.LoginRespon
 func (s *Server) Logout(context.Context, api.LogoutRequestObject) (api.LogoutResponseObject, error) {
 	return nil, ErrNotImplemented
 }
+
+func (s *Server) ListStudents(context.Context, api.ListStudentsRequestObject) (api.ListStudentsResponseObject, error) {
+	return nil, ErrNotImplemented
+}
+
+func (s *Server) GetStudent(context.Context, api.GetStudentRequestObject) (api.GetStudentResponseObject, error) {
+	return nil, ErrNotImplemented
+}

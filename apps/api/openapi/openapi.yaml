@@ -18,6 +18,7 @@ tags:
   - name: me
   - name: catalog
   - name: sessions
+  - name: students
   - name: reschedule
   - name: attendance
   - name: notifications
@@ -151,6 +152,55 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ClassGroup"
+
+  /students:
+    get:
+      operationId: listStudents
+      summary: Alumnos visibles para quien consulta, con sus profesores y horas del período
+      description: |
+        Dirección ve a todos. Un profesor ve solo a los alumnos de sus grupos, y de cada uno
+        únicamente su relación con él (nunca las clases ni las horas con otros profesores).
+        Un apoderado, o un alumno adulto, ve a los alumnos a su cargo con todos sus profesores.
+        Sin `from` y `to`, el período es el mes actual.
+      tags: [students]
+      parameters:
+        - $ref: "#/components/parameters/OptionalFrom"
+        - $ref: "#/components/parameters/OptionalTo"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/StudentOverview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+  /students/{studentId}:
+    get:
+      operationId: getStudent
+      summary: Un alumno con sus profesores, clases y horas del período
+      description: Mismas reglas de visibilidad que la lista.
+      tags: [students]
+      parameters:
+        - name: studentId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: "#/components/parameters/OptionalFrom"
+        - $ref: "#/components/parameters/OptionalTo"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudentOverview"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /sessions:
     get:
@@ -404,6 +454,18 @@ components:
         de salud y el inicio de sesión; sin ella responden 401 con el código `unauthenticated`.
 
   parameters:
+    OptionalFrom:
+      name: from
+      in: query
+      required: false
+      description: Inicio del período (incluido). Por defecto, el comienzo del mes actual.
+      schema: { type: string, format: date-time }
+    OptionalTo:
+      name: to
+      in: query
+      required: false
+      description: Fin del período (excluido). Por defecto, el comienzo del mes siguiente.
+      schema: { type: string, format: date-time }
     SessionId:
       name: sessionId
       in: path
@@ -539,6 +601,80 @@ components:
         durationMinutes: { type: integer, minimum: 1 }
         capacity: { type: integer, minimum: 1 }
         enrolled: { type: integer, minimum: 0 }
+
+    TeacherRef:
+      type: object
+      required: [id, fullName]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+
+    GroupBrief:
+      type: object
+      required: [id, name, instrument, level, kind, weekday, startTime, durationMinutes]
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        instrument: { type: string }
+        level: { type: string }
+        kind: { $ref: "#/components/schemas/GroupKind" }
+        weekday:
+          type: integer
+          minimum: 0
+          maximum: 6
+          description: 0 = domingo
+        startTime:
+          type: string
+          example: "16:00"
+        durationMinutes: { type: integer, minimum: 1 }
+        roomName: { type: string, nullable: true }
+
+    PeriodHours:
+      type: object
+      description: |
+        Minutos de clase del período. Las canceladas no cuentan como realizadas.
+        Una clase con reemplazo cuenta en la relación con el profesor titular del grupo.
+      required: [scheduledMinutes, completedMinutes, cancelledMinutes]
+      properties:
+        scheduledMinutes:
+          type: integer
+          minimum: 0
+          description: Clases del período que aún no se realizan
+        completedMinutes:
+          type: integer
+          minimum: 0
+          description: Clases del período que ya ocurrieron
+        cancelledMinutes:
+          type: integer
+          minimum: 0
+
+    StudentTeacherLink:
+      type: object
+      description: La relación de un alumno con un profesor.
+      required: [teacher, groups, hours]
+      properties:
+        teacher: { $ref: "#/components/schemas/TeacherRef" }
+        groups:
+          type: array
+          items: { $ref: "#/components/schemas/GroupBrief" }
+        hours: { $ref: "#/components/schemas/PeriodHours" }
+        nextSessionAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Próxima clase programada con este profesor (en cualquier fecha futura)
+
+    StudentOverview:
+      type: object
+      required: [id, fullName, age, links]
+      properties:
+        id: { type: string, format: uuid }
+        fullName: { type: string }
+        age: { type: integer, minimum: 0 }
+        links:
+          type: array
+          description: Un elemento por profesor visible para quien consulta
+          items: { $ref: "#/components/schemas/StudentTeacherLink" }
 
     SessionStatus:
       type: string

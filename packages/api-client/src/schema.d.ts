@@ -144,6 +144,49 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/students": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Alumnos visibles para quien consulta, con sus profesores y horas del período
+         * @description Dirección ve a todos. Un profesor ve solo a los alumnos de sus grupos, y de cada uno
+         *     únicamente su relación con él (nunca las clases ni las horas con otros profesores).
+         *     Un apoderado, o un alumno adulto, ve a los alumnos a su cargo con todos sus profesores.
+         *     Sin `from` y `to`, el período es el mes actual.
+         */
+        get: operations["listStudents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/students/{studentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Un alumno con sus profesores, clases y horas del período
+         * @description Mismas reglas de visibilidad que la lista.
+         */
+        get: operations["getStudent"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/sessions": {
         parameters: {
             query?: never;
@@ -391,6 +434,55 @@ export interface components {
             capacity: number;
             enrolled: number;
         };
+        TeacherRef: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+        };
+        GroupBrief: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            instrument: string;
+            level: string;
+            kind: components["schemas"]["GroupKind"];
+            /** @description 0 = domingo */
+            weekday: number;
+            /** @example 16:00 */
+            startTime: string;
+            durationMinutes: number;
+            roomName?: string | null;
+        };
+        /**
+         * @description Minutos de clase del período. Las canceladas no cuentan como realizadas.
+         *     Una clase con reemplazo cuenta en la relación con el profesor titular del grupo.
+         */
+        PeriodHours: {
+            /** @description Clases del período que aún no se realizan */
+            scheduledMinutes: number;
+            /** @description Clases del período que ya ocurrieron */
+            completedMinutes: number;
+            cancelledMinutes: number;
+        };
+        /** @description La relación de un alumno con un profesor. */
+        StudentTeacherLink: {
+            teacher: components["schemas"]["TeacherRef"];
+            groups: components["schemas"]["GroupBrief"][];
+            hours: components["schemas"]["PeriodHours"];
+            /**
+             * Format: date-time
+             * @description Próxima clase programada con este profesor (en cualquier fecha futura)
+             */
+            nextSessionAt?: string | null;
+        };
+        StudentOverview: {
+            /** Format: uuid */
+            id: string;
+            fullName: string;
+            age: number;
+            /** @description Un elemento por profesor visible para quien consulta */
+            links: components["schemas"]["StudentTeacherLink"][];
+        };
         /** @enum {string} */
         SessionStatus: "scheduled" | "completed" | "cancelled";
         Session: {
@@ -580,6 +672,10 @@ export interface components {
         };
     };
     parameters: {
+        /** @description Inicio del período (incluido). Por defecto, el comienzo del mes actual. */
+        OptionalFrom: string;
+        /** @description Fin del período (excluido). Por defecto, el comienzo del mes siguiente. */
+        OptionalTo: string;
         SessionId: string;
     };
     requestBodies: never;
@@ -768,6 +864,61 @@ export interface operations {
                     "application/json": components["schemas"]["ClassGroup"][];
                 };
             };
+        };
+    };
+    listStudents: {
+        parameters: {
+            query?: {
+                /** @description Inicio del período (incluido). Por defecto, el comienzo del mes actual. */
+                from?: components["parameters"]["OptionalFrom"];
+                /** @description Fin del período (excluido). Por defecto, el comienzo del mes siguiente. */
+                to?: components["parameters"]["OptionalTo"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOverview"][];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    getStudent: {
+        parameters: {
+            query?: {
+                /** @description Inicio del período (incluido). Por defecto, el comienzo del mes actual. */
+                from?: components["parameters"]["OptionalFrom"];
+                /** @description Fin del período (excluido). Por defecto, el comienzo del mes siguiente. */
+                to?: components["parameters"]["OptionalTo"];
+            };
+            header?: never;
+            path: {
+                studentId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StudentOverview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
         };
     };
     listSessions: {

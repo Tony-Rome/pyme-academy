@@ -1,4 +1,4 @@
-import { CalendarDays, Inbox, LogOut, Music } from "lucide-react";
+import { CalendarDays, Inbox, LogOut, Music, Users } from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 import { ApiStatus } from "@/components/ApiStatus";
 import { Badge } from "@/components/ui/badge";
@@ -7,12 +7,25 @@ import { useLogout } from "@/features/auth/hooks";
 import { useRequests } from "@/features/reschedule/hooks";
 import { useViewer } from "@/features/viewer/useViewer";
 import { ROLE_LABELS } from "@/lib/format";
+import type { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const NAV = [
-  { to: "/calendario", label: "Calendario", icon: CalendarDays },
-  { to: "/solicitudes", label: "Solicitudes", icon: Inbox },
-];
+type NavItem = { to: string; label: string; icon: typeof CalendarDays };
+
+const CALENDAR: NavItem = { to: "/calendario", label: "Calendario", icon: CalendarDays };
+const REQUESTS: NavItem = { to: "/solicitudes", label: "Solicitudes", icon: Inbox };
+
+/** Qué ve cada rol en el menú. */
+function navFor(role: Role | undefined): NavItem[] {
+  switch (role) {
+    case "director":
+      return [CALENDAR, { to: "/alumnos", label: "Alumnos", icon: Users }, REQUESTS];
+    case "teacher":
+      return [CALENDAR, { to: "/alumnos", label: "Mis alumnos", icon: Users }, REQUESTS];
+    default:
+      return [CALENDAR, { to: "/mis-clases", label: "Mis clases", icon: Users }, REQUESTS];
+  }
+}
 
 export function AppShell() {
   const viewer = useViewer().data;
@@ -32,7 +45,7 @@ export function AppShell() {
           </div>
 
           <nav aria-label="Principal" className="flex items-center gap-1">
-            {NAV.map(({ to, label, icon: Icon }) => (
+            {navFor(viewer?.activeRole).map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}
                 to={to}

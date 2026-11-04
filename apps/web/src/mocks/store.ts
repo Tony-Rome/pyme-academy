@@ -7,6 +7,8 @@ import type {
   RescheduleOption,
   RescheduleRequest,
   Session,
+  StudentOverview,
+  StudentTeacherLink,
   Viewer,
 } from "@/lib/types";
 import {
@@ -320,6 +322,97 @@ function toClassGroup(g: MockGroup): ClassGroup {
     capacity: g.capacity,
     enrolled: g.studentIds.length,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Alumnos y profesores vinculados
+// ---------------------------------------------------------------------------
+
+/** Mes actual en hora local: [inicio, inicio del mes siguiente). */
+export function currentMonth(): { from: Date; to: Date } {
+  const now = new Date();
+  return {
+    from: new Date(now.getFullYear(), now.getMonth(), 1),
+    to: new Date(now.getFullYear(), now.getMonth() + 1, 1),
+  };
+}
+
+/** Grupos de un alumno que quien consulta puede ver (un profesor, solo los suyos). */
+function visibleGroupsOf(studentId: string, u: MockUser): MockGroup[] {
+  return groups.filter((g) => {
+    if (!g.studentIds.includes(studentId)) return false;
+    return u.role === "teacher" ? g.teacherId === u.id : true;
+  });
+}
+
+function canSeeStudent(studentId: string, u: MockUser): boolean {
+  if (u.role === "director") return true;
+  if (u.role === "teacher") return visibleGroupsOf(studentId, u).length > 0;
+  return u.studentIds.includes(studentId);
+}
+
+function minutesOf(s: MockSession) {
+  return Math.round((new Date(s.endsAt).getTime() - new Date(s.startsAt).getTime()) / 60_000);
+}
+
+function toOverview(studentId: string, u: MockUser, from: Date, to: Date): StudentOverview {
+  const student = studentById.get(studentId)!;
+  const byTeacher = new Map<string, MockGroup[]>();
+  for (const g of visibleGroupsOf(studentId, u)) {
+    byTeacher.set(g.teacherId, [...(byTeacher.get(g.teacherId) ?? []), g]);
+  }
+
+  const now = Date.now();
+  const links: StudentTeacherLink[] = [...byTeacher.entries()].map(([teacherId, teacherGroups]) => {
+    const groupIds = new Set(teacherGroups.map((g) => g.id));
+    const mine = state.sessions.filter((s) => groupIds.has(s.classGroupId));
+
+    const hours = { scheduledMinutes: 0, completedMinutes: 0, cancelledMinutes: 0 };
+    for (const s of mine) {
+      const start = new Date(s.startsAt);
+      if (start < from || start >= to) continue;
+      if (s.status === "scheduled") hours.scheduledMinutes += minutesOf(s);
+      else if (s.status === "completed") hours.completedMinutes += minutesOf(s);
+      else hours.cancelledMinutes += minutesOf(s);
+    }
+
+    const next = mine
+      .filter((s) => s.status === "scheduled" && new Date(s.startsAt).getTime() > now)
+      .sort((a, b) => a.startsAt.localeCompare(b.startsAt))[0];
+
+    return {
+      teacher: { id: teacherId, fullName: teacherById.get(teacherId)!.fullName },
+      groups: teacherGroups.map((g) => ({
+        id: g.id,
+        name: g.name,
+        instrument: g.instrument,
+        level: g.level,
+        kind: g.kind,
+        weekday: g.weekday,
+        startTime: g.startTime,
+        durationMinutes: g.durationMinutes,
+        roomName: roomById.get(g.roomId)?.name ?? null,
+      })),
+      hours,
+      nextSessionAt: next?.startsAt ?? null,
+    };
+  });
+
+  links.sort((a, b) => a.teacher.fullName.localeCompare(b.teacher.fullName, "es"));
+  return { id: student.id, fullName: student.fullName, age: student.age, links };
+}
+
+export function listStudents(from: Date, to: Date): StudentOverview[] {
+  const u = currentUser();
+  return students
+    .filter((s) => canSeeStudent(s.id, u))
+    .map((s) => toOverview(s.id, u, from, to))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, "es"));
+}
+
+export function getStudent(id: string, from: Date, to: Date): StudentOverview | null {
+  const u = currentUser();
+  return studentById.has(id) && canSeeStudent(id, u) ? toOverview(id, u, from, to) : null;
 }
 
 // ---------------------------------------------------------------------------

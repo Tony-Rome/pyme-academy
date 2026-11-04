@@ -19,6 +19,18 @@ function authed(resolver: HttpResponseResolver): HttpResponseResolver {
   };
 }
 
+/** `from` y `to` opcionales; sin ellos, el mes actual. */
+function periodFrom(url: URL): { from: Date; to: Date } | null {
+  const rawFrom = url.searchParams.get("from");
+  const rawTo = url.searchParams.get("to");
+  if (!rawFrom && !rawTo) return store.currentMonth();
+  const from = new Date(rawFrom ?? "");
+  const to = new Date(rawTo ?? "");
+  return Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) ? null : { from, to };
+}
+
+const badPeriod = () => problem(400, "bad_request", "from y to deben ser fechas válidas");
+
 const respond = <T extends JsonBodyType>(result: store.Result<T>, status = 200) =>
   result.ok ? HttpResponse.json(result.value, { status }) : problem(result.status, result.code, result.message);
 
@@ -44,6 +56,23 @@ export const handlers = [
   http.get(`${BASE}/rooms`, authed(() => HttpResponse.json(store.listRooms()))),
   http.get(`${BASE}/teachers`, authed(() => HttpResponse.json(store.listTeachers()))),
   http.get(`${BASE}/class-groups`, authed(() => HttpResponse.json(store.listClassGroups()))),
+
+  http.get(
+    `${BASE}/students`,
+    authed(({ request }) => {
+      const range = periodFrom(new URL(request.url));
+      return range ? HttpResponse.json(store.listStudents(range.from, range.to)) : badPeriod();
+    }),
+  ),
+  http.get(
+    `${BASE}/students/:studentId`,
+    authed(({ params, request }) => {
+      const range = periodFrom(new URL(request.url));
+      if (!range) return badPeriod();
+      const student = store.getStudent(String(params.studentId), range.from, range.to);
+      return student ? HttpResponse.json(student) : problem(404, "not_found", "El alumno no existe");
+    }),
+  ),
 
   http.get(
     `${BASE}/sessions`,

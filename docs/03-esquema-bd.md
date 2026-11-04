@@ -114,6 +114,27 @@ WHERE e.student_id = :student_id
   AND date_trunc('month', rr.decided_at) = date_trunc('month', now());
 ```
 
+**Horas del mes de un alumno con cada profesor** (vistas "Alumnos" y "Mis clases"):
+```sql
+SELECT g.teacher_id, t.full_name,
+       coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+                FILTER (WHERE s.status = 'scheduled'), 0) AS programadas_min,
+       coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+                FILTER (WHERE s.status = 'completed'), 0) AS realizadas_min,
+       coalesce(sum(extract(epoch FROM s.ends_at - s.starts_at) / 60)
+                FILTER (WHERE s.status = 'cancelled'), 0) AS canceladas_min
+FROM enrollments e
+JOIN class_groups g ON g.id = e.class_group_id
+JOIN users t        ON t.id = g.teacher_id
+JOIN sessions s     ON s.class_group_id = g.id
+WHERE e.student_id = :student_id
+  AND e.status = 'active'
+  AND s.starts_at >= :desde AND s.starts_at < :hasta
+  AND s.starts_at::date >= e.started_on      -- no contar clases anteriores a la inscripción
+GROUP BY g.teacher_id, t.full_name;
+```
+Se agrupa por el profesor **titular del grupo**, así una clase con reemplazo cuenta en la relación con el titular. Para el profesor, la consulta se filtra además por `g.teacher_id = :profesor`, de modo que nunca ve las horas del alumno con otros profesores.
+
 **Asistencia por alumno en un período:**
 ```sql
 SELECT st.full_name,

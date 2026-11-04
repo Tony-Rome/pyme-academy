@@ -1,6 +1,6 @@
 # Historias de usuario: Fase 1
 
-> **Actualización:** el alcance de la fase 1 cambió en [04-mvp-fases.md](04-mvp-fases.md). Las épicas A a F, H1 a H3 e I1 a I3 siguen vigentes, y A5 (importación) pasa a imprescindible. La épica G (planes de clase) se mueve a la fase 4. Las épicas J (feriados), K (reemplazo de profesor), L (nota de sesión) y M (consentimientos y retiro de menores) se agregaron al final.
+> **Actualización:** el alcance de la fase 1 cambió en [04-mvp-fases.md](04-mvp-fases.md). Las épicas A a F, H1 a H3 e I1 a I3 siguen vigentes, y A5 (importación) pasa a imprescindible. La épica G (planes de clase) se mueve a la fase 4. Las épicas J (feriados), K (reemplazo de profesor), L (nota de sesión), M (consentimientos y retiro de menores) y N (alumnos y profesores vinculados) se agregaron al final.
 
 Prioridad (MoSCoW): **M** = imprescindible, **S** = importante, **C** = deseable.
 Formato: *Como [rol], quiero [acción], para [beneficio].*
@@ -219,11 +219,43 @@ Formato: *Como [rol], quiero [acción], para [beneficio].*
 
 ---
 
+## Épica N. Alumnos y profesores vinculados
+
+El calendario responde cuándo y dónde. Esta épica responde **con quién y cuánto**: quién enseña a quién, qué clases tiene cada relación y cuántas horas suma.
+
+**Definición de horas** (por alumno, por profesor y por mes):
+- **Programadas:** clases del mes que aún no se realizan.
+- **Realizadas:** clases del mes que ya ocurrieron.
+- **Canceladas:** clases del mes que se cancelaron (no cuentan como realizadas).
+- Las horas **asistidas** y los créditos de recuperación se suman más adelante (N6 y fase 2).
+- Una clase con reemplazo cuenta en la relación con el profesor titular del grupo.
+
+**N1 (S).** Como profesor, quiero ver la lista de mis alumnos, con su próxima clase y las horas del mes, para saber a quién enseño y cuánto.
+- Solo aparecen alumnos inscritos en grupos que dicto yo.
+- Se puede buscar por nombre.
+
+**N2 (S).** Como profesor, quiero abrir un alumno y ver las clases que tiene conmigo (día, hora, sala, tipo y nivel) y sus horas por mes, para preparar y revisar su avance.
+- Solo veo mi relación con ese alumno: no veo sus clases ni sus horas con otros profesores.
+
+**N3 (S).** Como apoderado o alumno adulto, quiero ver, por cada alumno a mi cargo, los profesores con los que está vinculado y, por cada profesor, sus clases asignadas y las horas del mes, para entender cuánto tiempo de clase recibe.
+- Veo todos los profesores de mis alumnos, y solo de ellos.
+
+**N4 (S).** Como usuario de estas vistas, quiero cambiar de mes, para revisar las horas de períodos anteriores o futuros.
+
+**N5 (S).** Como director, quiero ver el mismo detalle de cualquier alumno, con todos sus profesores, para responder consultas de las familias.
+
+**N6 (C).** Como profesor o apoderado, quiero ver también las horas a las que el alumno asistió, para comparar lo programado con lo que realmente ocurrió.
+- Depende de la asistencia (F1).
+
+**N7 (C).** Como usuario, quiero saltar de una clase de esta lista a su lugar en el calendario, para ver el contexto.
+
+---
+
 ## Orden sugerido de construcción
 1. A1–A3, B1–B2 (base).
 2. C1–C2, D1–D3, J1 (sin esto no hay producto).
 3. E1–E4, K1–K2, I1 (el diferenciador principal).
-4. F1, L1, M1–M5, H1–H3.
+4. F1, N1–N5, L1, M1–M5, H1–H3.
 5. A5 (importación), D4, y el resto de las S y C.
 
 ## Criterios de salida de la fase 1
